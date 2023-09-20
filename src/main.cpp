@@ -43,8 +43,10 @@ struct VertexBuffer
 
 struct FrameBuffer
 {
-    u32 width;
-    u32 height;
+    f32 x;
+    f32 y;
+    f32 width;
+    f32 height;
     DXGI_FORMAT format;
      
     ID3D11Texture2D *texture;
@@ -63,6 +65,12 @@ struct CBuffer
     Mat4 proj;
     Mat4 view;
     Mat4 world;
+};
+
+struct Rect
+{
+    f32 x, y;
+    f32 w, h;
 };
 
 static File ReadFile(char *filepath)
@@ -231,9 +239,11 @@ void UnloadVertexBuffer(VertexBuffer *vertexBuffer)
     vertexBuffer->verticesCount = 0;
 }
 
-FrameBuffer LoadFrameBuffer(u32 width, u32 height, DXGI_FORMAT format)
+FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT format)
 {
     FrameBuffer frameBuffer = {};
+    frameBuffer.x = x;
+    frameBuffer.y = y;
     frameBuffer.width = width;
     frameBuffer.height = height;
     frameBuffer.format = format;
@@ -286,15 +296,15 @@ FrameBuffer LoadFrameBuffer(u32 width, u32 height, DXGI_FORMAT format)
 
 void UnloadFrameBuffer(FrameBuffer *frameBuffer)
 {
-    if(frameBuffer->texture) frameBuffer->texture->Release();
-    if(frameBuffer->renderTargetView) frameBuffer->renderTargetView->Release();
-    if(frameBuffer->shaderResourceView) frameBuffer->shaderResourceView->Release();
+    if(frameBuffer->texture) frameBuffer->texture->Release(); frameBuffer->texture = 0;
+    if(frameBuffer->renderTargetView) frameBuffer->renderTargetView->Release(); frameBuffer->renderTargetView = 0;
+    if(frameBuffer->shaderResourceView) frameBuffer->shaderResourceView->Release(); frameBuffer->shaderResourceView = 0;
 }
 
-void ResizeFrameBuffer(FrameBuffer *frameBuffer, i32 width, i32 height)
+void ResizeFrameBuffer(FrameBuffer *frameBuffer, f32 x, f32 y, f32 width, f32 height)
 {
     UnloadFrameBuffer(frameBuffer);
-    *frameBuffer = LoadFrameBuffer(width, height, frameBuffer->format);
+    *frameBuffer = LoadFrameBuffer(x, y, width, height, frameBuffer->format);
 }
 
 static Vertex quad[] = {
@@ -307,6 +317,7 @@ static Vertex quad[] = {
     {{-0.5f,  0.5f, 0}, {1, 0, 0, 1}, {0, 1}},
     {{ 0.5f,  0.5f, 0}, {0, 0, 1, 1}, {1, 1}}
 };
+
 
 int main()
 {
@@ -322,14 +333,15 @@ int main()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
+    ImGui::StyleColorsClassic();
+    //ImGui::StyleColorsDark();
     //ImGui::StyleColorsLight();
 
     // Setup Platform/Renderer backends
     ImGui_ImplWin32_Init(window);
     ImGui_ImplDX11_Init(device, deviceContext);
 
-    bool show_demo_window = true;
+    bool show_demo_window = false;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.2f, 1.00f);
 
@@ -359,10 +371,17 @@ int main()
     VertexBuffer vertexBuffer = LoadVertexBuffer(quad, ARRAY_LENGTH(quad), layout);
 
     // Load FrameBuffer
-    FrameBuffer frameBuffer0 = LoadFrameBuffer(800, 500, DXGI_FORMAT_R8G8B8A8_UNORM);
-    FrameBuffer frameBuffer1 = LoadFrameBuffer(800, 500, DXGI_FORMAT_R8G8B8A8_UNORM);
-    FrameBuffer frameBuffer2 = LoadFrameBuffer(800, 500, DXGI_FORMAT_R8G8B8A8_UNORM);
-    FrameBuffer frameBuffer3 = LoadFrameBuffer(800, 500, DXGI_FORMAT_R8G8B8A8_UNORM);
+    f32 fixWidth = 200.0f;
+    f32 clientWidth = (1264.0f - fixWidth);
+    Rect uiRect = {0, 0, fixWidth, 681.0f};
+    Rect clientRect = {fixWidth, 0, clientWidth, 681.0f};
+
+    f32 frameWidth = clientRect.w*0.5f;
+    f32 frameHeight = clientRect.h*0.5f;
+    FrameBuffer frameBuffer0 = LoadFrameBuffer(             frameWidth*0.5f, frameHeight + frameHeight*0.5f, frameWidth-2, frameHeight-2, DXGI_FORMAT_R8G8B8A8_UNORM);
+    FrameBuffer frameBuffer1 = LoadFrameBuffer(frameWidth + frameWidth*0.5f,               frameHeight*0.5f, frameWidth-2, frameHeight-2, DXGI_FORMAT_R8G8B8A8_UNORM);
+    FrameBuffer frameBuffer2 = LoadFrameBuffer(             frameWidth*0.5f,               frameHeight*0.5f, frameWidth-2, frameHeight-2, DXGI_FORMAT_R8G8B8A8_UNORM);
+    FrameBuffer frameBuffer3 = LoadFrameBuffer(frameWidth + frameWidth*0.5f, frameHeight + frameHeight*0.5f, frameWidth-2, frameHeight-2, DXGI_FORMAT_R8G8B8A8_UNORM);
 
     // Create Sampler State
     ID3D11SamplerState *samplerState;
@@ -399,21 +418,33 @@ int main()
     while(running)
     {
         FlushEvents(window);
-        static i32 lastWidth = WINDOW_WIDTH;
-        static i32 lastHeight = WINDOW_HEIGHT;
+        static f32 lastWidth = 1264.0f;
+        static f32 lastHeight = 681.0f;
         if(resizeWidth != 0 && resizeHeight != 0)
         {
             ResizeD3D11();
             //cbuffer.proj = Mat4Perspective(60, (f32)resizeWidth/(f32)resizeHeight, 0.01f, 100.0f);
-            cbuffer.proj = Mat4Ortho((f32)resizeWidth*-0.5f, (f32)resizeWidth*0.5f,
-                                     (f32)resizeHeight*-0.5f, (f32)resizeHeight*0.5f,
-                                     0.01f, 100.0f);
+            cbuffer.proj = Mat4Ortho(0.0f, (f32)resizeWidth, 0.0f, (f32)resizeHeight, 0.0f, 100.0f);
             UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
+
+            clientWidth = (resizeWidth - fixWidth);
+            if(clientWidth > 0)
+            {
+                uiRect = {0, 0, fixWidth, (f32)resizeHeight};
+                clientRect = {fixWidth, 0, clientWidth, (f32)resizeHeight};
+
+                frameWidth = clientRect.w*0.5f;
+                frameHeight = clientRect.h*0.5f;
+                ResizeFrameBuffer(&frameBuffer0,              frameWidth*0.5f, frameHeight + frameHeight*0.5f, frameWidth-2, frameHeight-2);
+                ResizeFrameBuffer(&frameBuffer1, frameWidth + frameWidth*0.5f,               frameHeight*0.5f, frameWidth-2, frameHeight-2);
+                ResizeFrameBuffer(&frameBuffer2,              frameWidth*0.5f,               frameHeight*0.5f, frameWidth-2, frameHeight-2);
+                ResizeFrameBuffer(&frameBuffer3, frameWidth + frameWidth*0.5f, frameHeight + frameHeight*0.5f, frameWidth-2, frameHeight-2);
+            }
+
             lastWidth = resizeWidth;
             lastHeight = resizeHeight;
             resizeWidth = resizeHeight = 0;
-        }
-        
+        }        
 
         u32 stride = sizeof(Vertex);
         u32 offset = 0;
@@ -444,7 +475,7 @@ int main()
 
         cbuffer.proj = Mat4Perspective(60, (f32)frameBuffer0.width/(f32)frameBuffer0.height, 0.01f, 100.0f);
         
-        float clearColor_0[] = { 0.6, 0.1, 0.1, 1 };
+        f32 clearColor_0[] = { 0.6, 0.1, 0.1, 1 };
         deviceContext->ClearRenderTargetView(frameBuffer0.renderTargetView, clearColor_0);
         deviceContext->OMSetRenderTargets(1, &frameBuffer0.renderTargetView, 0);
         cbuffer.world = Mat4RotateY(angle) * Mat4RotateX(angle);
@@ -455,21 +486,21 @@ int main()
                                  frameBuffer1.height*-0.5f, frameBuffer1.height*0.5f,
                                  0.01f, 100.0f);
 
-        float clearColor_1[] = { 0.6, 0.6, 0.1, 1 };
+        f32 clearColor_1[] = { 0.6, 0.6, 0.1, 1 };
         deviceContext->ClearRenderTargetView(frameBuffer1.renderTargetView, clearColor_1);
         deviceContext->OMSetRenderTargets(1, &frameBuffer1.renderTargetView, 0);
         cbuffer.world = Mat4Translate(-sinf(angle) * 250, cosf(angle) * 100, 0) * Mat4Scale(300, 300, 1) * Mat4RotateZ(angle);
         UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
         deviceContext->Draw(vertexBuffer.verticesCount, 0);
 
-        float clearColor_2[] = { 0.6, 0.1, 0.6, 1 };
+        f32 clearColor_2[] = { 0.6, 0.1, 0.6, 1 };
         deviceContext->ClearRenderTargetView(frameBuffer2.renderTargetView, clearColor_2);
         deviceContext->OMSetRenderTargets(1, &frameBuffer2.renderTargetView, 0);
         cbuffer.world = Mat4Translate(sinf(angle) * 250, -cosf(angle) * 100, 0) * Mat4Scale(300, 300, 1);
         UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
         deviceContext->Draw(vertexBuffer.verticesCount, 0);
 
-        float clearColor_3[] = { 0.2, 0.6, 0.2, 1 };
+        f32 clearColor_3[] = { 0.2, 0.6, 0.2, 1 };
         deviceContext->ClearRenderTargetView(frameBuffer3.renderTargetView, clearColor_3);
         deviceContext->OMSetRenderTargets(1, &frameBuffer3.renderTargetView, 0);
         cbuffer.world = Mat4Translate(-sinf(angle) * 250, -cosf(angle) * 100, 0) * Mat4Scale(300, 300, 1);
@@ -503,7 +534,11 @@ int main()
             static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+            ImGui::Begin("Hello, world!", 0, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoCollapse); // Create a window called "Hello, world!" and append into it.
+
+            // TODO: try change size and position
+            ImGui::SetWindowSize(ImVec2(fixWidth, lastHeight));
+            ImGui::SetWindowPos(ImVec2(0, 0));
 
             ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
             ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
@@ -544,24 +579,27 @@ int main()
         deviceContext->ClearRenderTargetView(renderTargetView, clearColor1);
         deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
 
-        f32 xOffset = 150;
         deviceContext->PSSetShaderResources(0, 1, &frameBuffer0.shaderResourceView);
-        cbuffer.world = Mat4Translate(xOffset + -402, 252, 0) * Mat4Scale(frameBuffer0.width, frameBuffer0.height, 1);
+        cbuffer.world = Mat4Translate(clientRect.x + frameBuffer0.x,
+                                      clientRect.y + frameBuffer0.y, 0) * Mat4Scale(frameBuffer0.width, frameBuffer0.height, 1);
         UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
         deviceContext->Draw(vertexBuffer.verticesCount, 0);
 
         deviceContext->PSSetShaderResources(0, 1, &frameBuffer1.shaderResourceView);
-        cbuffer.world = Mat4Translate(xOffset + 402, 252, 0) * Mat4Scale(frameBuffer0.width, frameBuffer0.height, 1);
+        cbuffer.world = Mat4Translate(clientRect.x + frameBuffer1.x,
+                                      clientRect.y + frameBuffer1.y, 0) * Mat4Scale(frameBuffer0.width, frameBuffer0.height, 1);
         UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
         deviceContext->Draw(vertexBuffer.verticesCount, 0);
 
         deviceContext->PSSetShaderResources(0, 1, &frameBuffer2.shaderResourceView);
-        cbuffer.world = Mat4Translate(xOffset + -402, -252, 0) * Mat4Scale(frameBuffer0.width, frameBuffer0.height, 1);
+        cbuffer.world = Mat4Translate(clientRect.x + frameBuffer2.x,
+                                      clientRect.y + frameBuffer2.y, 0) * Mat4Scale(frameBuffer0.width, frameBuffer0.height, 1);
         UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
         deviceContext->Draw(vertexBuffer.verticesCount, 0);
 
         deviceContext->PSSetShaderResources(0, 1, &frameBuffer3.shaderResourceView);
-        cbuffer.world = Mat4Translate(xOffset + 402, -252, 0) * Mat4Scale(frameBuffer0.width, frameBuffer0.height, 1);
+        cbuffer.world = Mat4Translate(clientRect.x + frameBuffer3.x,
+                                      clientRect.y + frameBuffer3.y, 0) * Mat4Scale(frameBuffer0.width, frameBuffer0.height, 1);
         UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
         deviceContext->Draw(vertexBuffer.verticesCount, 0);
         

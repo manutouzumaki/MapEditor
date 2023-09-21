@@ -59,14 +59,8 @@ static Vertex quad[] = {
 };
 
 #include "win32.cpp"
+#include "line.cpp"
 #include "view.cpp"
-
-// TODO: ...
-#include "mainView.cpp"
-#include "frontView.cpp"
-#include "topView.cpp"
-#include "sideView.cpp"
-
 
 bool MouseJustDown()
 {
@@ -92,6 +86,42 @@ bool MouseJustUp()
     }
     return false;
 }
+
+// TODO: try to animate the grid
+void Draw2dGrid(f32 offsetX, f32 offsetY,
+                f32 width, f32 height, f32 zoom)
+{
+    // Only for debug
+    f32 tileSize = zoom;
+    f32 tileCountX = (width / tileSize) + 1;
+    f32 tileCountY = (height / tileSize) + 1;
+
+    f32 currentX = (width*-0.5f) + fmod(offsetX, tileSize);;
+    for(i32 x = 0; x < tileCountX; ++x)
+    {
+        DrawLine(currentX, height*-0.5f, 0,
+                 currentX, height* 0.5f, 0,
+                 0xFF333333);
+        currentX += tileSize;
+    }
+
+
+    f32 currentY = (height*-0.5f) + fmod(offsetY, tileSize);;
+    for(i32 y = 0; y < tileCountY; ++y)
+    {
+        DrawLine(width*-0.5f, currentY, 0,
+                 width* 0.5f, currentY, 0,
+                 0xFF333333);
+        currentY += tileSize;
+    }
+
+    LineRendererDraw();
+}
+
+#include "mainView.cpp"
+#include "frontView.cpp"
+#include "topView.cpp"
+#include "sideView.cpp"
 
 bool MouseInDivisorX(Rect clientRect, f32 fixWidth)
 {
@@ -182,6 +212,7 @@ int main()
     HINSTANCE instace = GetModuleHandle(0);
     HWND window = InitWindow(instace);
     InitD3D11(window);
+    LineRendererInitialize(200);
 
     // Set up Dear imgui context
     IMGUI_CHECKVERSION();
@@ -346,6 +377,11 @@ int main()
             resizeWidth = resizeHeight = 0;
         }        
 
+        for(i32 i = 0; i < 4; ++i)
+        {
+            ViewProcess(views + i);
+        }
+
         u32 stride = sizeof(Vertex);
         u32 offset = 0;
         deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -452,7 +488,6 @@ int main()
             deviceContext->Draw(vertexBuffer.verticesCount, 0);
         }
 
-
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
         
         swapChain->Present(1, 0);
@@ -477,6 +512,7 @@ int main()
     if(layout) layout->Release();
     if(samplerState) samplerState->Release();
 
+    LineRendererShutdown();
     ShutdownD3D11();
 
     return 0;

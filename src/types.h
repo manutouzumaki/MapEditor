@@ -63,4 +63,10 @@ struct Rect
     f32 w, h;
 };
 
+struct RectMinMax
+{
+    f32 minX, minY;
+    f32 maxX, maxY;
+};
+
 #endif

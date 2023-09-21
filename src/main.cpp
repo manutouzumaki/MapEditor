@@ -7,6 +7,7 @@
 
 #include <windows.h>
 #include <windowsX.h>
+#include <dwmapi.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 
@@ -16,6 +17,7 @@
 
 // TODO: add a g prefix to all the globals
 // global variable to handle diferent states of the app
+// TODO: see is there are a better way to handle this globas
 static bool running;
 static i32 windowX;
 static i32 windowY;
@@ -31,7 +33,8 @@ static f32 separation = 6;
 static f32 newDivisorX;
 static f32 newDivisorY;
 
-static bool modifyViews;
+static bool modifyViewsX;
+static bool modifyViewsY;
 
 static i32 mouseX;
 static i32 mouseY;
@@ -59,10 +62,10 @@ static Vertex quad[] = {
 #include "view.cpp"
 
 // TODO: ...
-// #include "mainView.cpp"
-// #include "frontView.cpp"
-// #include "topView.cpp"
-// #include "sideView.cpp"
+#include "mainView.cpp"
+#include "frontView.cpp"
+#include "topView.cpp"
+#include "sideView.cpp"
 
 
 bool MouseJustDown()
@@ -90,11 +93,88 @@ bool MouseJustUp()
     return false;
 }
 
+bool MouseInDivisorX(Rect clientRect, f32 fixWidth)
+{
+    // handle the vertical line
+    f32 xpos = clientRect.w * divisorX;
+    RectMinMax vRect = {xpos-separation*0.5f, 0, xpos+separation*0.5f, clientRect.h};
+
+    i32 mouseRelX = mouseX - fixWidth;
+    i32 mouseRelY = mouseY;
+    
+    if(mouseRelX >= vRect.minX && mouseRelX <= vRect.maxX &&
+       mouseRelY >= vRect.minY && mouseRelY <= vRect.maxY)
+    {
+        return true;
+    }
+    return false;
+}
+
+bool MouseInDivisorY(Rect clientRect, f32 fixWidth)
+{
+    // handle the horizontal line
+    f32 ypos = clientRect.h * divisorY;
+    RectMinMax vRect = {0, ypos-separation*0.5f, clientRect.w, ypos+separation*0.5f};
+
+    i32 mouseRelX = mouseX - fixWidth;
+    i32 mouseRelY = mouseY;
+    
+    if(mouseRelX >= vRect.minX && mouseRelX <= vRect.maxX &&
+       mouseRelY >= vRect.minY && mouseRelY <= vRect.maxY)
+    {
+        return true;
+    }
+    return false;
+}
+
 f32 Clamp(f32 v, f32 min, f32 max)
 {
     if(v <= min) return min;
     if(v >= max) return max;
     return v;
+}
+
+void RecalculateViewDimensions(View *views, Rect clientRect)
+{
+    f32 viewWidth  = clientRect.w * divisorX;
+    f32 viewHeight = clientRect.h * divisorY;
+    if(viewWidth-separation > 1 && viewHeight-separation > 1)
+    {
+        ViewResize(views + 0,
+                   viewWidth*0.5f,
+                   (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
+                   viewWidth-separation, viewHeight-separation);
+    }
+
+    viewWidth  = clientRect.w * (1.0f-divisorX);
+    viewHeight = clientRect.h * divisorY;
+    if(viewWidth-separation > 1 && viewHeight-separation > 1)
+    {
+        ViewResize(views + 1,
+                   (clientRect.w*divisorX)+viewWidth*0.5f,
+                   (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
+                   viewWidth-separation, viewHeight-separation);
+    }
+
+    viewWidth  = clientRect.w * divisorX;
+    viewHeight = clientRect.h * (1.0f-divisorY);
+    if(viewWidth-separation > 1 && viewHeight-separation > 1)
+    {
+        ViewResize(views + 2,
+                   viewWidth*0.5f,
+                   viewHeight*0.5f,
+                   viewWidth-separation, viewHeight-separation);
+    }
+
+    viewWidth  = clientRect.w * (1.0f-divisorX);
+    viewHeight = clientRect.h * (1.0f-divisorY);
+    if(viewWidth-separation > 1 && viewHeight-separation > 1)
+    {
+        ViewResize(views + 3,
+                   (clientRect.w*divisorX)+viewWidth*0.5f,
+                   viewHeight*0.5f,
+                   viewWidth-separation, viewHeight-separation);
+    }
 }
 
 int main()
@@ -168,7 +248,7 @@ int main()
                           (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
                           viewWidth-separation, viewHeight-separation,
                           PROJ_TYPE_ORTHO,
-                          SetupOtherView, ProcessOtherView, RenderOtherView);
+                          SetupTopView, ProcessTopView, RenderTopView);
 
     viewWidth  = clientRect.w * divisorX;
     viewHeight = clientRect.h * (1.0f-divisorY);
@@ -176,7 +256,7 @@ int main()
                           viewHeight*0.5f,
                           viewWidth-separation, viewHeight-separation,
                           PROJ_TYPE_ORTHO,
-                          SetupOtherView, ProcessOtherView, RenderOtherView);
+                          SetupFrontView, ProcessFrontView, RenderFrontView);
 
     viewWidth  = clientRect.w * (1.0f-divisorX);
     viewHeight = clientRect.h * (1.0f-divisorY);
@@ -184,7 +264,7 @@ int main()
                           viewHeight*0.5f,
                           viewWidth-separation, viewHeight-separation,
                           PROJ_TYPE_ORTHO,
-                          SetupOtherView, ProcessOtherView, RenderOtherView);
+                          SetupSideView, ProcessSideView, RenderSideView);
 
     // Create Sampler State
     ID3D11SamplerState *samplerState;
@@ -205,7 +285,7 @@ int main()
 
     // create the const buffer data to be pass to the gpu
     Vec3 up  = {0, 1,  0};
-    Vec3 pos = {0, 0, -2};
+    Vec3 pos = {0, 0, -50};
     Vec3 tar = {0, 0, 0};
     CBuffer cbuffer{};
     cbuffer.view = Mat4LookAt(pos, tar, up);
@@ -213,7 +293,7 @@ int main()
     cbuffer.proj = Mat4Ortho(0.0f, (f32)WINDOW_WIDTH, 0.0f, (f32)WINDOW_HEIGHT, 0.0f, 100.0f);
     constBuffer = LoadConstBuffer((void *)&cbuffer, sizeof(CBuffer), 0);
 
-    ShowWindow(window, 1);
+    ShowWindow(window, SW_MAXIMIZE);
     running = true;
     while(running)
     {
@@ -224,67 +304,27 @@ int main()
 
         if(MouseJustDown())
         {
-            modifyViews = true;
+            if(MouseInDivisorX(clientRect, fixWidth)) modifyViewsX = true;
+            if(MouseInDivisorY(clientRect, fixWidth)) modifyViewsY = true;
         }
 
         if(MouseJustUp())
         {
-            divisorX = newDivisorX;
-            divisorY = newDivisorY;
-
-            viewWidth  = clientRect.w * divisorX;
-            viewHeight = clientRect.h * divisorY;
-            if(viewWidth-separation > 1 && viewHeight-separation > 1)
-            {
-                ViewResize(views + 0,
-                           viewWidth*0.5f,
-                           (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
-                           viewWidth-separation, viewHeight-separation);
-            }
-
-            viewWidth  = clientRect.w * (1.0f-divisorX);
-            viewHeight = clientRect.h * divisorY;
-            if(viewWidth-separation > 1 && viewHeight-separation > 1)
-            {
-                ViewResize(views + 1,
-                           (clientRect.w*divisorX)+viewWidth*0.5f,
-                           (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
-                           viewWidth-separation, viewHeight-separation);
-            }
-
-            viewWidth  = clientRect.w * divisorX;
-            viewHeight = clientRect.h * (1.0f-divisorY);
-            if(viewWidth-separation > 1 && viewHeight-separation > 1)
-            {
-                ViewResize(views + 2,
-                           viewWidth*0.5f,
-                           viewHeight*0.5f,
-                           viewWidth-separation, viewHeight-separation);
-            }
-
-            viewWidth  = clientRect.w * (1.0f-divisorX);
-            viewHeight = clientRect.h * (1.0f-divisorY);
-            if(viewWidth-separation > 1 && viewHeight-separation > 1)
-            {
-                ViewResize(views + 3,
-                           (clientRect.w*divisorX)+viewWidth*0.5f,
-                           viewHeight*0.5f,
-                           viewWidth-separation, viewHeight-separation);
-            }
-
-
-            modifyViews = false;
+            if(modifyViewsX) { divisorX = newDivisorX; modifyViewsX = false; }
+            if(modifyViewsY) { divisorY = newDivisorY; modifyViewsY = false; }
+            RecalculateViewDimensions(views, clientRect);
         }
 
-        if(modifyViews)
+        if(modifyViewsX)
         {
             i32 mouseRelX = mouseX - fixWidth;
-            i32 mouseRelY = mouseY;
-
             newDivisorX = Clamp(mouseRelX / clientRect.w, 0.1f, 0.9f);
+        }
+
+        if(modifyViewsY)
+        {
+            i32 mouseRelY = mouseY;
             newDivisorY = Clamp(mouseRelY / clientRect.h, 0.1f, 0.9f);
-            
-            printf("mouseX: %d, mouseY: %d\n", mouseRelX, mouseRelY);
         }
 
         if(resizeWidth != 0 && resizeHeight != 0)
@@ -298,46 +338,7 @@ int main()
             {
                 uiRect = {0, 0, fixWidth, (f32)resizeHeight};
                 clientRect = {fixWidth, 0, clientWidth, (f32)resizeHeight};
-
-                viewWidth  = clientRect.w * divisorX;
-                viewHeight = clientRect.h * divisorY;
-                if(viewWidth-separation > 1 && viewHeight-separation > 1)
-                {
-                    ViewResize(views + 0,
-                               viewWidth*0.5f,
-                               (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
-                               viewWidth-separation, viewHeight-separation);
-                }
-
-                viewWidth  = clientRect.w * (1.0f-divisorX);
-                viewHeight = clientRect.h * divisorY;
-                if(viewWidth-separation > 1 && viewHeight-separation > 1)
-                {
-                    ViewResize(views + 1,
-                               (clientRect.w*divisorX)+viewWidth*0.5f,
-                               (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
-                               viewWidth-separation, viewHeight-separation);
-                }
-
-                viewWidth  = clientRect.w * divisorX;
-                viewHeight = clientRect.h * (1.0f-divisorY);
-                if(viewWidth-separation > 1 && viewHeight-separation > 1)
-                {
-                    ViewResize(views + 2,
-                               viewWidth*0.5f,
-                               viewHeight*0.5f,
-                               viewWidth-separation, viewHeight-separation);
-                }
-
-                viewWidth  = clientRect.w * (1.0f-divisorX);
-                viewHeight = clientRect.h * (1.0f-divisorY);
-                if(viewWidth-separation > 1 && viewHeight-separation > 1)
-                {
-                    ViewResize(views + 3,
-                               (clientRect.w*divisorX)+viewWidth*0.5f,
-                               viewHeight*0.5f,
-                               viewWidth-separation, viewHeight-separation);
-                }
+                RecalculateViewDimensions(views, clientRect);
             }
 
             currentWindowWidth = resizeWidth;
@@ -376,7 +377,6 @@ int main()
 
             ImGui::Begin("Hello, world!", 0, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoCollapse); // Create a window called "Hello, world!" and append into it.
 
-            // TODO: try change size and position
             ImGui::SetWindowSize(ImVec2(fixWidth, currentWindowHeight));
             ImGui::SetWindowPos(ImVec2(0, 0));
 
@@ -415,26 +415,6 @@ int main()
         deviceContext->ClearRenderTargetView(renderTargetView, clearColor);
         deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
 
-       
-        if(modifyViews)
-        {
-            // draw the mouse position 
-            deviceContext->VSSetShader(colShader.vertex, 0, 0);
-            deviceContext->PSSetShader(colShader.fragment, 0, 0);
-
-            // Horizontal line
-            cbuffer.world = Mat4Translate(clientRect.x + clientRect.w * newDivisorX,
-                                          clientRect.y + clientRect.h*0.5f, 0) * Mat4Scale(3, clientRect.h, 1);
-            UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
-            deviceContext->Draw(vertexBuffer.verticesCount, 0);
-            
-            // Vertical line
-            cbuffer.world = Mat4Translate(clientRect.x + clientRect.w*0.5f,
-                                          clientRect.y + clientRect.h * (1.0f-newDivisorY), 0) * Mat4Scale(clientRect.w, 3, 1);
-            UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
-            deviceContext->Draw(vertexBuffer.verticesCount, 0);
-        }
-
         deviceContext->VSSetShader(texShader.vertex, 0, 0);
         deviceContext->PSSetShader(texShader.fragment, 0, 0);
 
@@ -443,10 +423,35 @@ int main()
         {
             deviceContext->PSSetShaderResources(0, 1, &views[i].fb.shaderResourceView);
             cbuffer.world = Mat4Translate(clientRect.x + views[i].x,
-                                          clientRect.y + views[i].y, 0) * Mat4Scale(views[i].w, views[i].h, 1);
+                                          clientRect.y + views[i].y, 1) * Mat4Scale(views[i].w, views[i].h, 1);
             UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
             deviceContext->Draw(vertexBuffer.verticesCount, 0);
         }
+
+        if(modifyViewsX)
+        {
+            // draw the mouse position 
+            deviceContext->VSSetShader(colShader.vertex, 0, 0);
+            deviceContext->PSSetShader(colShader.fragment, 0, 0);
+
+            // Horizontal line
+            cbuffer.world = Mat4Translate(clientRect.x + clientRect.w * newDivisorX,
+                                          clientRect.y + clientRect.h*0.5f, 0.0f) * Mat4Scale(3, clientRect.h, 1);
+            UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
+            deviceContext->Draw(vertexBuffer.verticesCount, 0);
+        }
+        if(modifyViewsY)
+        {
+            // draw the mouse position 
+            deviceContext->VSSetShader(colShader.vertex, 0, 0);
+            deviceContext->PSSetShader(colShader.fragment, 0, 0);
+            // Vertical line
+            cbuffer.world = Mat4Translate(clientRect.x + clientRect.w*0.5f,
+                                          clientRect.y + clientRect.h * (1.0f-newDivisorY), 0.0f) * Mat4Scale(clientRect.w, 3, 1);
+            UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
+            deviceContext->Draw(vertexBuffer.verticesCount, 0);
+        }
+
 
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
         

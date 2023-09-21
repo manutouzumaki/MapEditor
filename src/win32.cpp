@@ -54,6 +54,10 @@ static LRESULT CALLBACK WndProcA(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lPar
     return result;
 }
 
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+
 static HWND InitWindow(HINSTANCE instace)
 {
     // Create Win32 Window
@@ -85,6 +89,9 @@ static HWND InitWindow(HINSTANCE instace)
         wr.bottom - wr.top,
         0, 0, instace, 0);
 
+    BOOL value = TRUE;
+    ::DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
+
     return window;
 }
 
@@ -110,9 +117,9 @@ static void InitD3D11(HWND window)
     // create the d3d11 device swapchain and device context
     DXGI_SWAP_CHAIN_DESC swapChainDesc;
     memset(&swapChainDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
-    swapChainDesc.BufferCount = 2;
-    swapChainDesc.BufferDesc.Width = 0;
-    swapChainDesc.BufferDesc.Height = 0;
+    swapChainDesc.BufferCount = 1;
+    swapChainDesc.BufferDesc.Width = WINDOW_WIDTH;
+    swapChainDesc.BufferDesc.Height = WINDOW_HEIGHT;
     swapChainDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     swapChainDesc.BufferDesc.RefreshRate.Numerator = 60;
     swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
@@ -165,8 +172,8 @@ static void InitD3D11(HWND window)
     // create the depth stencil texture
     ID3D11Texture2D* depthStencilTexture = 0;
     D3D11_TEXTURE2D_DESC depthStencilTextureDesc;
-    depthStencilTextureDesc.Width = 0;
-    depthStencilTextureDesc.Height = 0;
+    depthStencilTextureDesc.Width = WINDOW_WIDTH;
+    depthStencilTextureDesc.Height = WINDOW_HEIGHT;
     depthStencilTextureDesc.MipLevels = 1;
     depthStencilTextureDesc.ArraySize = 1;
     depthStencilTextureDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -301,13 +308,10 @@ static void FlushEvents(HWND window)
             {
                 mouseDown = false;
             } break;
-
-            default:
-            {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
-            } break;
         }
+
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
 }
 

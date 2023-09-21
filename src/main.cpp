@@ -23,9 +23,20 @@ static u32 resizeWidth;
 static u32 resizeHeight;
 static f32 currentWindowWidth = WINDOW_WIDTH;
 static f32 currentWindowHeight = WINDOW_HEIGHT;
+
 static f32 divisorX = 0.5f;
 static f32 divisorY = 0.5f;
 static f32 separation = 6;
+
+static f32 newDivisorX;
+static f32 newDivisorY;
+
+static bool modifyViews;
+
+static i32 mouseX;
+static i32 mouseY;
+static bool mouseDown;
+static bool mouseWasDown;
 
 // global variables for use during rendering
 static Shader colShader;
@@ -52,6 +63,39 @@ static Vertex quad[] = {
 // #include "frontView.cpp"
 // #include "topView.cpp"
 // #include "sideView.cpp"
+
+
+bool MouseJustDown()
+{
+    if(mouseDown != mouseWasDown)
+    {
+        if(mouseDown)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool MouseJustUp()
+{
+    if(mouseDown != mouseWasDown)
+    {
+        if(mouseWasDown)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+f32 Clamp(f32 v, f32 min, f32 max)
+{
+    if(v <= min) return min;
+    if(v >= max) return max;
+    return v;
+}
 
 int main()
 {
@@ -173,7 +217,76 @@ int main()
     running = true;
     while(running)
     {
+        mouseWasDown = false;
+        if(mouseDown) mouseWasDown = true;
+        
         FlushEvents(window);
+
+        if(MouseJustDown())
+        {
+            modifyViews = true;
+        }
+
+        if(MouseJustUp())
+        {
+            divisorX = newDivisorX;
+            divisorY = newDivisorY;
+
+            viewWidth  = clientRect.w * divisorX;
+            viewHeight = clientRect.h * divisorY;
+            if(viewWidth-separation > 1 && viewHeight-separation > 1)
+            {
+                ViewResize(views + 0,
+                           viewWidth*0.5f,
+                           (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
+                           viewWidth-separation, viewHeight-separation);
+            }
+
+            viewWidth  = clientRect.w * (1.0f-divisorX);
+            viewHeight = clientRect.h * divisorY;
+            if(viewWidth-separation > 1 && viewHeight-separation > 1)
+            {
+                ViewResize(views + 1,
+                           (clientRect.w*divisorX)+viewWidth*0.5f,
+                           (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
+                           viewWidth-separation, viewHeight-separation);
+            }
+
+            viewWidth  = clientRect.w * divisorX;
+            viewHeight = clientRect.h * (1.0f-divisorY);
+            if(viewWidth-separation > 1 && viewHeight-separation > 1)
+            {
+                ViewResize(views + 2,
+                           viewWidth*0.5f,
+                           viewHeight*0.5f,
+                           viewWidth-separation, viewHeight-separation);
+            }
+
+            viewWidth  = clientRect.w * (1.0f-divisorX);
+            viewHeight = clientRect.h * (1.0f-divisorY);
+            if(viewWidth-separation > 1 && viewHeight-separation > 1)
+            {
+                ViewResize(views + 3,
+                           (clientRect.w*divisorX)+viewWidth*0.5f,
+                           viewHeight*0.5f,
+                           viewWidth-separation, viewHeight-separation);
+            }
+
+
+            modifyViews = false;
+        }
+
+        if(modifyViews)
+        {
+            i32 mouseRelX = mouseX - fixWidth;
+            i32 mouseRelY = mouseY;
+
+            newDivisorX = Clamp(mouseRelX / clientRect.w, 0.1f, 0.9f);
+            newDivisorY = Clamp(mouseRelY / clientRect.h, 0.1f, 0.9f);
+            
+            printf("mouseX: %d, mouseY: %d\n", mouseRelX, mouseRelY);
+        }
+
         if(resizeWidth != 0 && resizeHeight != 0)
         {
             ResizeD3D11();
@@ -298,13 +411,32 @@ int main()
         //  render to main render target output
         deviceContext->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
         
+        float clearColor[] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
+        deviceContext->ClearRenderTargetView(renderTargetView, clearColor);
+        deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
+
+       
+        if(modifyViews)
+        {
+            // draw the mouse position 
+            deviceContext->VSSetShader(colShader.vertex, 0, 0);
+            deviceContext->PSSetShader(colShader.fragment, 0, 0);
+
+            // Horizontal line
+            cbuffer.world = Mat4Translate(clientRect.x + clientRect.w * newDivisorX,
+                                          clientRect.y + clientRect.h*0.5f, 0) * Mat4Scale(3, clientRect.h, 1);
+            UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
+            deviceContext->Draw(vertexBuffer.verticesCount, 0);
+            
+            // Vertical line
+            cbuffer.world = Mat4Translate(clientRect.x + clientRect.w*0.5f,
+                                          clientRect.y + clientRect.h * (1.0f-newDivisorY), 0) * Mat4Scale(clientRect.w, 3, 1);
+            UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
+            deviceContext->Draw(vertexBuffer.verticesCount, 0);
+        }
+
         deviceContext->VSSetShader(texShader.vertex, 0, 0);
         deviceContext->PSSetShader(texShader.fragment, 0, 0);
-        
-        
-        float clearColor1[] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
-        deviceContext->ClearRenderTargetView(renderTargetView, clearColor1);
-        deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
 
         // Render the for Views
         for(i32 i = 0; i < 4; ++i)
@@ -315,7 +447,7 @@ int main()
             UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
             deviceContext->Draw(vertexBuffer.verticesCount, 0);
         }
-        
+
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
         
         swapChain->Present(1, 0);

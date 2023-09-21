@@ -288,6 +288,20 @@ static void FlushEvents(HWND window)
         switch(msg.message)
         {
             // TODO: handle important messages
+            case WM_MOUSEMOVE:
+            {
+                mouseX = (i32)GET_X_LPARAM(msg.lParam);
+                mouseY = (i32)GET_Y_LPARAM(msg.lParam);
+            } break;
+            case WM_LBUTTONDOWN:
+            {
+                mouseDown = true;
+            } break;
+            case WM_LBUTTONUP:
+            {
+                mouseDown = false;
+            } break;
+
             default:
             {
                 TranslateMessage(&msg);

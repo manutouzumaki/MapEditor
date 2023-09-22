@@ -12,6 +12,13 @@
 #define VEC_EPSILON 0.000001f
 #define MAT_EPSILON 0.000001f
 
+f32 Clamp(f32 v, f32 min, f32 max)
+{
+    if(v <= min) return min;
+    if(v >= max) return max;
+    return v;
+}
+
 f32 Lerp(f32 a, f32 b, f32 t)
 {
     return (1.0f - t) * a + b * t;

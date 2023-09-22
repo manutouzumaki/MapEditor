@@ -308,6 +308,10 @@ static void FlushEvents(HWND window)
             {
                 mouseDown = false;
             } break;
+            case WM_MOUSEWHEEL:
+            {
+                mouseWheelDelta = GET_WHEEL_DELTA_WPARAM(msg.wParam) / 120;
+            } break;
         }
 
         TranslateMessage(&msg);

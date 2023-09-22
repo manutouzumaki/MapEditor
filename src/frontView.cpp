@@ -4,11 +4,15 @@ static f32 gFrontViewOffsetY;
 static f32 gFrontViewLastClickX;
 static f32 gFrontViewLastClickY;
 
+static f32 gFrontViewWheelOffset;
+static f32 gFrontViewZoom;
+
 static bool gFrontViewHot;
 
 void SetupFrontView(View *view)
 {
-
+    gFrontViewWheelOffset = 25.0f;
+    gFrontViewZoom = Remap(0.0f, 50.0f, 0.05f, 1.0f, gFrontViewWheelOffset);
 }
 
 void ProcessFrontView(View *view)
@@ -23,6 +27,10 @@ void ProcessFrontView(View *view)
     if(mouseRelX >= view->w*-0.5f && mouseRelX <= view->w*0.5f &&
        mouseRelY >= view->h*-0.5f && mouseRelY <= view->h*0.5f)
     {
+        gFrontViewWheelOffset += (f32)mouseWheelDelta;
+        gFrontViewWheelOffset = Clamp(gFrontViewWheelOffset, 0.0f, 50.0f);
+        gFrontViewZoom = Remap(0.0f, 50.0f, 0.05f, 1.0f, gFrontViewWheelOffset);
+
         if(MouseJustDown())
         {
             gFrontViewHot = true;
@@ -39,7 +47,7 @@ void ProcessFrontView(View *view)
     if(gFrontViewHot)
     {
         gFrontViewOffsetX += mouseRelX - gFrontViewLastClickX;
-        gFrontViewOffsetY += -(mouseRelY - gFrontViewLastClickY);
+        gFrontViewOffsetY += mouseRelY - gFrontViewLastClickY;
         gFrontViewLastClickX = mouseRelX;
         gFrontViewLastClickY = mouseRelY;
     }
@@ -47,29 +55,23 @@ void ProcessFrontView(View *view)
 
 void RenderFrontView(View *view)
 {
-    // Update the constBuffer
-    UpdateConstBuffer(&constBuffer, (void *)&view->cbuffer);
-    
-
-
-    Draw2dGrid(gFrontViewOffsetX, gFrontViewOffsetY, view->w, view->h, 30.0f);
-
-    u32 stride = sizeof(Vertex);
-    u32 offset = 0;
-    deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    deviceContext->IASetInputLayout(vertexBuffer.layout);
-    deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer.GPUBuffer, &stride, &offset);
-    
+    // set the shader
     deviceContext->VSSetShader(colShader.vertex, 0, 0);
     deviceContext->PSSetShader(colShader.fragment, 0, 0);
 
-
-    // Update the constBuffer
-    static f32 angle = 0; angle += 0.01f;
-    view->cbuffer.world = Mat4Translate(-sinf(angle) * 250, cosf(angle) * 100, 0) *
-                          Mat4Scale(300, 300, 1) * Mat4RotateZ(angle);
-    UpdateConstBuffer(&constBuffer, (void *)&view->cbuffer);
+    f32 viewUnit = gViewMaxZoom * gFrontViewZoom;
     
-    // Render the vertices
-    deviceContext->Draw(vertexBuffer.verticesCount, 0);
+    // Update the constBuffer
+    view->cbuffer.view = Mat4LookAt({0, 0, -50}, {0, 0, 0}, {0, 1, 0});
+    UpdateConstBuffer(&constBuffer, (void *)&view->cbuffer);
+    Draw2dGrid(gFrontViewOffsetX, gFrontViewOffsetY, view->w, view->h, viewUnit);
+
+    // Update the view matrix
+    view->cbuffer.view = Mat4LookAt({-gFrontViewOffsetX, -gFrontViewOffsetY, -50},
+                                    {-gFrontViewOffsetX, -gFrontViewOffsetY, 0},
+                                    {0, 1, 0});
+    UpdateConstBuffer(&constBuffer, (void *)&view->cbuffer);
+    DrawLine(0, 0, 0, viewUnit, 0, 0, 0xFFFF0000);
+    DrawLine(0, 0, 0, 0, viewUnit, 0, 0xFF00FF00);
+    LineRendererDraw();
 }

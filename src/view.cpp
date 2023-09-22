@@ -22,6 +22,8 @@ struct View
     RenderFNP render;
 };
 
+static f32 gViewMaxZoom = 128.0f;
+
 View ViewCreate(f32 x, f32 y, f32 w, f32 h, ProjType projType,
                 SetupFNP setup,
                 ProcessFNP process,

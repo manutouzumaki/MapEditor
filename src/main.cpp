@@ -40,6 +40,7 @@ static i32 mouseX;
 static i32 mouseY;
 static bool mouseDown;
 static bool mouseWasDown;
+static i32 mouseWheelDelta;
 
 // global variables for use during rendering
 static Shader colShader;
@@ -49,13 +50,13 @@ static VertexBuffer vertexBuffer;
 
 static Vertex quad[] = {
     // Face 1
-    {{-0.5f, -0.5f, 0}, {1, 1, 0, 1}, {0, 0}},
-    {{-0.5f,  0.5f, 0}, {1, 0, 0, 1}, {0, 1}},
-    {{ 0.5f, -0.5f, 0}, {0, 1, 0, 1}, {1, 0}},
+    {{-0.5f, -0.5f, 0}, {1, 1, 0, 1}, {0, 1}},
+    {{-0.5f,  0.5f, 0}, {1, 0, 0, 1}, {0, 0}},
+    {{ 0.5f, -0.5f, 0}, {0, 1, 0, 1}, {1, 1}},
     // Face 2
-    {{ 0.5f, -0.5f, 0}, {0, 1, 0, 1}, {1, 0}},
-    {{-0.5f,  0.5f, 0}, {1, 0, 0, 1}, {0, 1}},
-    {{ 0.5f,  0.5f, 0}, {0, 0, 1, 1}, {1, 1}}
+    {{ 0.5f, -0.5f, 0}, {0, 1, 0, 1}, {1, 1}},
+    {{-0.5f,  0.5f, 0}, {1, 0, 0, 1}, {0, 0}},
+    {{ 0.5f,  0.5f, 0}, {0, 0, 1, 1}, {1, 0}}
 };
 
 #include "win32.cpp"
@@ -87,7 +88,6 @@ bool MouseJustUp()
     return false;
 }
 
-// TODO: try to animate the grid
 void Draw2dGrid(f32 offsetX, f32 offsetY,
                 f32 width, f32 height, f32 zoom)
 {
@@ -95,24 +95,41 @@ void Draw2dGrid(f32 offsetX, f32 offsetY,
     f32 tileSize = zoom;
     f32 tileCountX = (width / tileSize) + 1;
     f32 tileCountY = (height / tileSize) + 1;
+    u32 color = 0xFF333333;
 
-    f32 currentX = (width*-0.5f) + fmod(offsetX, tileSize);;
-    for(i32 x = 0; x < tileCountX; ++x)
+    f32 currentX = 0 + fmod(offsetX, tileSize);
+    for(i32 x = 0; x < tileCountX/2; ++x)
     {
         DrawLine(currentX, height*-0.5f, 0,
                  currentX, height* 0.5f, 0,
-                 0xFF333333);
+                 color);
         currentX += tileSize;
+    }
+    currentX = 0 + fmod(offsetX, tileSize);
+    for(i32 x = 0; x < tileCountX/2; ++x)
+    {
+        DrawLine(currentX, height*-0.5f, 0,
+                 currentX, height* 0.5f, 0,
+                 color);
+        currentX -= tileSize;
     }
 
 
-    f32 currentY = (height*-0.5f) + fmod(offsetY, tileSize);;
-    for(i32 y = 0; y < tileCountY; ++y)
+    f32 currentY = 0 + fmod(offsetY, tileSize);
+    for(i32 y = 0; y < tileCountY/2; ++y)
     {
         DrawLine(width*-0.5f, currentY, 0,
                  width* 0.5f, currentY, 0,
-                 0xFF333333);
+                 color);
         currentY += tileSize;
+    }
+    currentY = 0 + fmod(offsetY, tileSize);
+    for(i32 y = 0; y < tileCountY/2; ++y)
+    {
+        DrawLine(width*-0.5f, currentY, 0,
+                 width* 0.5f, currentY, 0,
+                 color);
+        currentY -= tileSize;
     }
 
     LineRendererDraw();
@@ -155,13 +172,6 @@ bool MouseInDivisorY(Rect clientRect, f32 fixWidth)
         return true;
     }
     return false;
-}
-
-f32 Clamp(f32 v, f32 min, f32 max)
-{
-    if(v <= min) return min;
-    if(v >= max) return max;
-    return v;
 }
 
 void RecalculateViewDimensions(View *views, Rect clientRect)
@@ -325,9 +335,16 @@ int main()
     constBuffer = LoadConstBuffer((void *)&cbuffer, sizeof(CBuffer), 0);
 
     ShowWindow(window, SW_MAXIMIZE);
+
+    for(i32 i = 0; i < 4; ++i)
+    {
+        ViewSetup(views + i);
+    }
+
     running = true;
     while(running)
     {
+        mouseWheelDelta = 0;
         mouseWasDown = false;
         if(mouseDown) mouseWasDown = true;
         
@@ -382,12 +399,7 @@ int main()
             ViewProcess(views + i);
         }
 
-        u32 stride = sizeof(Vertex);
-        u32 offset = 0;
-        deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        deviceContext->IASetInputLayout(vertexBuffer.layout);
-        deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer.GPUBuffer, &stride, &offset);
-
+        // TODO: remove this
         deviceContext->VSSetShader(colShader.vertex, 0, 0);
         deviceContext->PSSetShader(colShader.fragment, 0, 0);
 
@@ -396,6 +408,11 @@ int main()
             ViewRender(views + i);
         }
 
+        u32 stride = sizeof(Vertex);
+        u32 offset = 0;
+        deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        deviceContext->IASetInputLayout(vertexBuffer.layout);
+        deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer.GPUBuffer, &stride, &offset);
 
         // Start the Dear ImGui frame
         ImGui_ImplDX11_NewFrame();

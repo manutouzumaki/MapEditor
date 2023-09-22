@@ -397,22 +397,8 @@ int main()
         for(i32 i = 0; i < 4; ++i)
         {
             ViewProcess(views + i);
-        }
-
-        // TODO: remove this
-        deviceContext->VSSetShader(colShader.vertex, 0, 0);
-        deviceContext->PSSetShader(colShader.fragment, 0, 0);
-
-        for(i32 i = 0; i < 4; ++i)
-        {
             ViewRender(views + i);
         }
-
-        u32 stride = sizeof(Vertex);
-        u32 offset = 0;
-        deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        deviceContext->IASetInputLayout(vertexBuffer.layout);
-        deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer.GPUBuffer, &stride, &offset);
 
         // Start the Dear ImGui frame
         ImGui_ImplDX11_NewFrame();
@@ -462,6 +448,11 @@ int main()
         ImGui::Render();
         
         //  render to main render target output
+        u32 stride = sizeof(Vertex);
+        u32 offset = 0;
+        deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        deviceContext->IASetInputLayout(vertexBuffer.layout);
+        deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer.GPUBuffer, &stride, &offset);
         deviceContext->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
         
         float clearColor[] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };

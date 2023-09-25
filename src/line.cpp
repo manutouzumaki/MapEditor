@@ -56,7 +56,6 @@ static void LineRendererShutdown()
 
 static void LineRendererDraw()
 {
-    
     D3D11_MAPPED_SUBRESOURCE bufferData;
     ZeroMemory(&bufferData, sizeof(bufferData));
     deviceContext->Map(gGPULineBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &bufferData);
@@ -72,7 +71,6 @@ static void LineRendererDraw()
     deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
     deviceContext->Draw(gLineBufferUsed, 0);
     gLineBufferUsed = 0;
-
 }
 
 static void LocalToWorldLine(LineVertex *line, u32 count, f32 ax, f32 ay, f32 az, f32 bx, f32 by, f32 bz)

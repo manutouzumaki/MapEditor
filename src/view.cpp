@@ -23,6 +23,7 @@ struct View
 };
 
 static f32 gViewMaxZoom = 128.0f;
+static f32 gViewUnitSize = 64.0f;
 
 View ViewCreate(f32 x, f32 y, f32 w, f32 h, ProjType projType,
                 SetupFNP setup,
@@ -116,8 +117,8 @@ void ViewRender(View *view)
 
     viewport.TopLeftX = 0.0f;
     viewport.TopLeftY = 0.0f;
-    viewport.Width = currentWindowWidth;
-    viewport.Height = currentWindowHeight;
+    viewport.Width = gCurrentWindowWidth;
+    viewport.Height = gCurrentWindowHeight;
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     deviceContext->RSSetViewports(1, &viewport);

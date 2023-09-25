@@ -18,8 +18,8 @@ void SetupSideView(View *view)
 void ProcessSideView(View *view)
 {
     // TODO: get the mouse relative to the view
-    i32 mouseRelToClientX = mouseX - 200; // TODO: use a global for this value
-    i32 mouseRelToClientY = currentWindowHeight - mouseY;
+    i32 mouseRelToClientX = MouseX() - 200; // TODO: use a global for this value
+    i32 mouseRelToClientY = gCurrentWindowHeight - MouseY();
 
     i32 mouseRelX = mouseRelToClientX - view->x;
     i32 mouseRelY = mouseRelToClientY - view->y;
@@ -27,11 +27,11 @@ void ProcessSideView(View *view)
     if(mouseRelX >= view->w*-0.5f && mouseRelX <= view->w*0.5f &&
        mouseRelY >= view->h*-0.5f && mouseRelY <= view->h*0.5f)
     {
-        gSideViewWheelOffset += (f32)mouseWheelDelta;
+        gSideViewWheelOffset += (f32)MouseWheelDelta();
         gSideViewWheelOffset = Clamp(gSideViewWheelOffset, 0.0f, 50.0f);
         gSideViewZoom = Remap(0.0f, 50.0f, 0.05f, 1.0f, gSideViewWheelOffset);
 
-        if(MouseJustDown())
+        if(MouseJustDown(MOUSE_BUTTON_RIGHT))
         {
             gSideViewHot = true;
             gSideViewLastClickX = mouseRelX;
@@ -39,7 +39,7 @@ void ProcessSideView(View *view)
         }
     }
 
-    if(MouseJustUp() && gSideViewHot)
+    if(MouseJustUp(MOUSE_BUTTON_RIGHT) && gSideViewHot)
     {
         gSideViewHot = false;
     }
@@ -56,21 +56,21 @@ void ProcessSideView(View *view)
 void RenderSideView(View *view)
 {
     // set the shader
-    deviceContext->VSSetShader(colShader.vertex, 0, 0);
-    deviceContext->PSSetShader(colShader.fragment, 0, 0);
+    deviceContext->VSSetShader(gColShader.vertex, 0, 0);
+    deviceContext->PSSetShader(gColShader.fragment, 0, 0);
 
     f32 viewUnit = gViewMaxZoom * gSideViewZoom;
     
     // Update the constBuffer
     view->cbuffer.view = Mat4LookAt({0, 0, -50}, {0, 0, 0}, {0, 1, 0});
-    UpdateConstBuffer(&constBuffer, (void *)&view->cbuffer);
+    UpdateConstBuffer(&gConstBuffer, (void *)&view->cbuffer);
     Draw2dGrid(gSideViewOffsetX, gSideViewOffsetY, view->w, view->h, viewUnit);
 
     // Update the view matrix
     view->cbuffer.view = Mat4LookAt({-gSideViewOffsetX, -gSideViewOffsetY, -50},
                                     {-gSideViewOffsetX, -gSideViewOffsetY, 0},
                                     {0, 1, 0});
-    UpdateConstBuffer(&constBuffer, (void *)&view->cbuffer);
+    UpdateConstBuffer(&gConstBuffer, (void *)&view->cbuffer);
     DrawLine(0, 0, 0, viewUnit, 0, 0, 0xFFFF0000);
     DrawLine(0, 0, 0, 0, viewUnit, 0, 0xFF00FF00);
     LineRendererDraw();

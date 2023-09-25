@@ -27,21 +27,21 @@ static LRESULT CALLBACK WndProcA(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lPar
 
     case WM_CLOSE:
     {
-        running = false;
+        gRunning = false;
     } break;
 
     case WM_MOVE:
     {
-        windowX = (i32)LOWORD(lParam);
-        windowY = (i32)HIWORD(lParam);
+        gWindowX = (i32)LOWORD(lParam);
+        gWindowY = (i32)HIWORD(lParam);
     } break;
 
     case WM_SIZE:
     {
         if (wParam == SIZE_MINIMIZED)
             return 0;
-        resizeWidth = (u32)LOWORD(lParam); // Queue resize
-        resizeHeight = (u32)HIWORD(lParam);
+        gResizeWidth = (u32)LOWORD(lParam); // Queue resize
+        gResizeHeight = (u32)HIWORD(lParam);
     } break;
 
     default:
@@ -297,20 +297,23 @@ static void FlushEvents(HWND window)
             // TODO: handle important messages
             case WM_MOUSEMOVE:
             {
-                mouseX = (i32)GET_X_LPARAM(msg.lParam);
-                mouseY = (i32)GET_Y_LPARAM(msg.lParam);
+                gInput.x = (i32)GET_X_LPARAM(msg.lParam);
+                gInput.y = (i32)GET_Y_LPARAM(msg.lParam);
             } break;
             case WM_LBUTTONDOWN:
-            {
-                mouseDown = true;
-            } break;
             case WM_LBUTTONUP:
+            case WM_RBUTTONDOWN:
+            case WM_RBUTTONUP:
+            case WM_MBUTTONDOWN:
+            case WM_MBUTTONUP:
             {
-                mouseDown = false;
+                gInput.buttons[0].down = ((msg.wParam & MK_LBUTTON) != 0); 
+                gInput.buttons[1].down = ((msg.wParam & MK_MBUTTON) != 0); 
+                gInput.buttons[2].down = ((msg.wParam & MK_RBUTTON) != 0); 
             } break;
             case WM_MOUSEWHEEL:
             {
-                mouseWheelDelta = GET_WHEEL_DELTA_WPARAM(msg.wParam) / 120;
+                gInput.wheelDelta = GET_WHEEL_DELTA_WPARAM(msg.wParam) / 120;
             } break;
         }
 
@@ -324,7 +327,7 @@ static void ResizeD3D11()
     if(renderTargetView) renderTargetView->Release(); renderTargetView = 0;
     if(depthStencilView) depthStencilView->Release(); depthStencilView = 0;
     
-    swapChain->ResizeBuffers(0, resizeWidth, resizeHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+    swapChain->ResizeBuffers(0, gResizeWidth, gResizeHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
     
     // re create render target view
     ID3D11Texture2D *backBufferTexture = 0;
@@ -337,8 +340,8 @@ static void ResizeD3D11()
     // create the depth stencil texture
     ID3D11Texture2D* depthStencilTexture = 0;
     D3D11_TEXTURE2D_DESC depthStencilTextureDesc;
-    depthStencilTextureDesc.Width = resizeWidth;
-    depthStencilTextureDesc.Height = resizeHeight;
+    depthStencilTextureDesc.Width = gResizeWidth;
+    depthStencilTextureDesc.Height = gResizeHeight;
     depthStencilTextureDesc.MipLevels = 1;
     depthStencilTextureDesc.ArraySize = 1;
     depthStencilTextureDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -368,8 +371,8 @@ static void ResizeD3D11()
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0.0f;
     viewport.TopLeftY = 0.0f;
-    viewport.Width = (f32)resizeWidth;
-    viewport.Height = (f32)resizeHeight;
+    viewport.Width = (f32)gResizeWidth;
+    viewport.Height = (f32)gResizeHeight;
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     deviceContext->RSSetViewports(1, &viewport);

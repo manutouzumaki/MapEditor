@@ -69,4 +69,10 @@ struct RectMinMax
     f32 maxX, maxY;
 };
 
+struct Poly2D
+{
+    Vec2 *vertices;
+    i32 verticesCount;
+};
+
 #endif

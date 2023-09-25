@@ -15,40 +15,32 @@
 #include "math.h"
 #include "types.h"
 
-// TODO: add a g prefix to all the globals
-// global variable to handle diferent states of the app
 // TODO: see is there are a better way to handle this globas
-static bool running;
-static i32 windowX;
-static i32 windowY;
-static u32 resizeWidth;
-static u32 resizeHeight;
-static f32 currentWindowWidth = WINDOW_WIDTH;
-static f32 currentWindowHeight = WINDOW_HEIGHT;
 
-static f32 divisorX = 0.5f;
-static f32 divisorY = 0.5f;
-static f32 separation = 6;
+// gobals to handle general app and window state
+static bool gRunning;
+static i32 gWindowX;
+static i32 gWindowY;
+static u32 gResizeWidth;
+static u32 gResizeHeight;
+static f32 gCurrentWindowWidth = WINDOW_WIDTH;
+static f32 gCurrentWindowHeight = WINDOW_HEIGHT;
 
-static f32 newDivisorX;
-static f32 newDivisorY;
-
-static bool modifyViewsX;
-static bool modifyViewsY;
-
-static i32 mouseX;
-static i32 mouseY;
-static bool mouseDown;
-static bool mouseWasDown;
-static i32 mouseWheelDelta;
+// gobals to handle app view distibution state
+static f32 gDivisorX = 0.5f;
+static f32 gDivisorY = 0.5f;
+static f32 gNewDivisorX;
+static f32 gNewDivisorY;
+static f32 gSeparation = 6;
+static bool gModifyViewsX;
+static bool gModifyViewsY;
 
 // global variables for use during rendering
-static Shader colShader;
-static Shader texShader;
-static ConstBuffer constBuffer;
-static VertexBuffer vertexBuffer;
-
-static Vertex quad[] = {
+static Shader gColShader;
+static Shader gTexShader;
+static ConstBuffer gConstBuffer;
+static VertexBuffer gVertexBuffer;
+static Vertex gQuad[] = {
     // Face 1
     {{-0.5f, -0.5f, 0}, {1, 1, 0, 1}, {0, 1}},
     {{-0.5f,  0.5f, 0}, {1, 0, 0, 1}, {0, 0}},
@@ -59,34 +51,10 @@ static Vertex quad[] = {
     {{ 0.5f,  0.5f, 0}, {0, 0, 1, 1}, {1, 0}}
 };
 
+#include "input.cpp"
 #include "win32.cpp"
 #include "line.cpp"
 #include "view.cpp"
-
-bool MouseJustDown()
-{
-    if(mouseDown != mouseWasDown)
-    {
-        if(mouseDown)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-
-bool MouseJustUp()
-{
-    if(mouseDown != mouseWasDown)
-    {
-        if(mouseWasDown)
-        {
-            return true;
-        }
-    }
-    return false;
-}
 
 void Draw2dGrid(f32 offsetX, f32 offsetY,
                 f32 width, f32 height, f32 zoom)
@@ -143,11 +111,11 @@ void Draw2dGrid(f32 offsetX, f32 offsetY,
 bool MouseInDivisorX(Rect clientRect, f32 fixWidth)
 {
     // handle the vertical line
-    f32 xpos = clientRect.w * divisorX;
-    RectMinMax vRect = {xpos-separation*0.5f, 0, xpos+separation*0.5f, clientRect.h};
+    f32 xpos = clientRect.w * gDivisorX;
+    RectMinMax vRect = {xpos-gSeparation*0.5f, 0, xpos+gSeparation*0.5f, clientRect.h};
 
-    i32 mouseRelX = mouseX - fixWidth;
-    i32 mouseRelY = mouseY;
+    i32 mouseRelX = MouseX() - fixWidth;
+    i32 mouseRelY = MouseY();
     
     if(mouseRelX >= vRect.minX && mouseRelX <= vRect.maxX &&
        mouseRelY >= vRect.minY && mouseRelY <= vRect.maxY)
@@ -160,11 +128,11 @@ bool MouseInDivisorX(Rect clientRect, f32 fixWidth)
 bool MouseInDivisorY(Rect clientRect, f32 fixWidth)
 {
     // handle the horizontal line
-    f32 ypos = clientRect.h * divisorY;
-    RectMinMax vRect = {0, ypos-separation*0.5f, clientRect.w, ypos+separation*0.5f};
+    f32 ypos = clientRect.h * gDivisorY;
+    RectMinMax vRect = {0, ypos-gSeparation*0.5f, clientRect.w, ypos+gSeparation*0.5f};
 
-    i32 mouseRelX = mouseX - fixWidth;
-    i32 mouseRelY = mouseY;
+    i32 mouseRelX = MouseX() - fixWidth;
+    i32 mouseRelY = MouseY();
     
     if(mouseRelX >= vRect.minX && mouseRelX <= vRect.maxX &&
        mouseRelY >= vRect.minY && mouseRelY <= vRect.maxY)
@@ -176,44 +144,44 @@ bool MouseInDivisorY(Rect clientRect, f32 fixWidth)
 
 void RecalculateViewDimensions(View *views, Rect clientRect)
 {
-    f32 viewWidth  = clientRect.w * divisorX;
-    f32 viewHeight = clientRect.h * divisorY;
-    if(viewWidth-separation > 1 && viewHeight-separation > 1)
+    f32 viewWidth  = clientRect.w * gDivisorX;
+    f32 viewHeight = clientRect.h * gDivisorY;
+    if(viewWidth-gSeparation > 1 && viewHeight-gSeparation > 1)
     {
         ViewResize(views + 0,
                    viewWidth*0.5f,
-                   (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
-                   viewWidth-separation, viewHeight-separation);
+                   (clientRect.h*(1.0f-gDivisorY))+viewHeight*0.5f,
+                   viewWidth-gSeparation, viewHeight-gSeparation);
     }
 
-    viewWidth  = clientRect.w * (1.0f-divisorX);
-    viewHeight = clientRect.h * divisorY;
-    if(viewWidth-separation > 1 && viewHeight-separation > 1)
+    viewWidth  = clientRect.w * (1.0f-gDivisorX);
+    viewHeight = clientRect.h * gDivisorY;
+    if(viewWidth-gSeparation > 1 && viewHeight-gSeparation > 1)
     {
         ViewResize(views + 1,
-                   (clientRect.w*divisorX)+viewWidth*0.5f,
-                   (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
-                   viewWidth-separation, viewHeight-separation);
+                   (clientRect.w*gDivisorX)+viewWidth*0.5f,
+                   (clientRect.h*(1.0f-gDivisorY))+viewHeight*0.5f,
+                   viewWidth-gSeparation, viewHeight-gSeparation);
     }
 
-    viewWidth  = clientRect.w * divisorX;
-    viewHeight = clientRect.h * (1.0f-divisorY);
-    if(viewWidth-separation > 1 && viewHeight-separation > 1)
+    viewWidth  = clientRect.w * gDivisorX;
+    viewHeight = clientRect.h * (1.0f-gDivisorY);
+    if(viewWidth-gSeparation > 1 && viewHeight-gSeparation > 1)
     {
         ViewResize(views + 2,
                    viewWidth*0.5f,
                    viewHeight*0.5f,
-                   viewWidth-separation, viewHeight-separation);
+                   viewWidth-gSeparation, viewHeight-gSeparation);
     }
 
-    viewWidth  = clientRect.w * (1.0f-divisorX);
-    viewHeight = clientRect.h * (1.0f-divisorY);
-    if(viewWidth-separation > 1 && viewHeight-separation > 1)
+    viewWidth  = clientRect.w * (1.0f-gDivisorX);
+    viewHeight = clientRect.h * (1.0f-gDivisorY);
+    if(viewWidth-gSeparation > 1 && viewHeight-gSeparation > 1)
     {
         ViewResize(views + 3,
-                   (clientRect.w*divisorX)+viewWidth*0.5f,
+                   (clientRect.w*gDivisorX)+viewWidth*0.5f,
                    viewHeight*0.5f,
-                   viewWidth-separation, viewHeight-separation);
+                   viewWidth-gSeparation, viewHeight-gSeparation);
     }
 }
 
@@ -244,8 +212,8 @@ int main()
 
 
     // Load Shader and Create Input Layout
-    colShader = LoadShader("../src/shaders/colVert.hlsl", "../src/shaders/colFrag.hlsl");
-    texShader = LoadShader("../src/shaders/texVert.hlsl", "../src/shaders/texFrag.hlsl");
+    gColShader = LoadShader("../src/shaders/colVert.hlsl", "../src/shaders/colFrag.hlsl");
+    gTexShader = LoadShader("../src/shaders/texVert.hlsl", "../src/shaders/texFrag.hlsl");
     
     ID3D11InputLayout *layout = 0;
     D3D11_INPUT_ELEMENT_DESC inputLayoutDesc[] =
@@ -260,12 +228,12 @@ int main()
     i32 totalLayoutElements = ARRAY_LENGTH(inputLayoutDesc);
     device->CreateInputLayout(inputLayoutDesc,
         totalLayoutElements,
-        colShader.vertexShaderCompiled->GetBufferPointer(),
-        colShader.vertexShaderCompiled->GetBufferSize(),
+        gColShader.vertexShaderCompiled->GetBufferPointer(),
+        gColShader.vertexShaderCompiled->GetBufferSize(),
         &layout);
 
     // Load Vertex Buffer
-    vertexBuffer = LoadVertexBuffer(quad, ARRAY_LENGTH(quad), layout);
+    gVertexBuffer = LoadVertexBuffer(gQuad, ARRAY_LENGTH(gQuad), layout);
 
     // Load FrameBuffer
     f32 fixWidth = 200.0f;
@@ -275,35 +243,35 @@ int main()
     
     View views[4];
 
-    f32 viewWidth  = clientRect.w * divisorX;
-    f32 viewHeight = clientRect.h * divisorY;
+    f32 viewWidth  = clientRect.w * gDivisorX;
+    f32 viewHeight = clientRect.h * gDivisorY;
     views[0] = ViewCreate(viewWidth*0.5f,
-                          (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
-                          viewWidth-separation, viewHeight-separation,
+                          (clientRect.h*(1.0f-gDivisorY))+viewHeight*0.5f,
+                          viewWidth-gSeparation, viewHeight-gSeparation,
                           PROJ_TYPE_PERSP,
                           SetupMainView, ProcessMainView, RenderMainView);
 
-    viewWidth  = clientRect.w * (1.0f-divisorX);
-    viewHeight = clientRect.h * divisorY;
-    views[1] = ViewCreate((clientRect.w*divisorX)+viewWidth*0.5f,
-                          (clientRect.h*(1.0f-divisorY))+viewHeight*0.5f,
-                          viewWidth-separation, viewHeight-separation,
+    viewWidth  = clientRect.w * (1.0f-gDivisorX);
+    viewHeight = clientRect.h * gDivisorY;
+    views[1] = ViewCreate((clientRect.w*gDivisorX)+viewWidth*0.5f,
+                          (clientRect.h*(1.0f-gDivisorY))+viewHeight*0.5f,
+                          viewWidth-gSeparation, viewHeight-gSeparation,
                           PROJ_TYPE_ORTHO,
                           SetupTopView, ProcessTopView, RenderTopView);
 
-    viewWidth  = clientRect.w * divisorX;
-    viewHeight = clientRect.h * (1.0f-divisorY);
+    viewWidth  = clientRect.w * gDivisorX;
+    viewHeight = clientRect.h * (1.0f-gDivisorY);
     views[2] = ViewCreate(viewWidth*0.5f,
                           viewHeight*0.5f,
-                          viewWidth-separation, viewHeight-separation,
+                          viewWidth-gSeparation, viewHeight-gSeparation,
                           PROJ_TYPE_ORTHO,
                           SetupFrontView, ProcessFrontView, RenderFrontView);
 
-    viewWidth  = clientRect.w * (1.0f-divisorX);
-    viewHeight = clientRect.h * (1.0f-divisorY);
-    views[3] = ViewCreate((clientRect.w*divisorX)+viewWidth*0.5f,
+    viewWidth  = clientRect.w * (1.0f-gDivisorX);
+    viewHeight = clientRect.h * (1.0f-gDivisorY);
+    views[3] = ViewCreate((clientRect.w*gDivisorX)+viewWidth*0.5f,
                           viewHeight*0.5f,
-                          viewWidth-separation, viewHeight-separation,
+                          viewWidth-gSeparation, viewHeight-gSeparation,
                           PROJ_TYPE_ORTHO,
                           SetupSideView, ProcessSideView, RenderSideView);
 
@@ -332,7 +300,7 @@ int main()
     cbuffer.view = Mat4LookAt(pos, tar, up);
     cbuffer.world = Mat4Identity();
     cbuffer.proj = Mat4Ortho(0.0f, (f32)WINDOW_WIDTH, 0.0f, (f32)WINDOW_HEIGHT, 0.0f, 100.0f);
-    constBuffer = LoadConstBuffer((void *)&cbuffer, sizeof(CBuffer), 0);
+    gConstBuffer = LoadConstBuffer((void *)&cbuffer, sizeof(CBuffer), 0);
 
     ShowWindow(window, SW_MAXIMIZE);
 
@@ -341,57 +309,59 @@ int main()
         ViewSetup(views + i);
     }
 
-    running = true;
-    while(running)
+    gRunning = true;
+    while(gRunning)
     {
-        mouseWheelDelta = 0;
-        mouseWasDown = false;
-        if(mouseDown) mouseWasDown = true;
-        
+        InputPrepareForFrame();
         FlushEvents(window);
 
-        if(MouseJustDown())
+        if(MouseJustUp(MOUSE_BUTTON_MIDDLE))
         {
-            if(MouseInDivisorX(clientRect, fixWidth)) modifyViewsX = true;
-            if(MouseInDivisorY(clientRect, fixWidth)) modifyViewsY = true;
+            printf("middle just up\n");
         }
 
-        if(MouseJustUp())
+        if(MouseJustDown(MOUSE_BUTTON_LEFT))
         {
-            if(modifyViewsX) { divisorX = newDivisorX; modifyViewsX = false; }
-            if(modifyViewsY) { divisorY = newDivisorY; modifyViewsY = false; }
+            if(MouseInDivisorX(clientRect, fixWidth)) gModifyViewsX = true;
+            if(MouseInDivisorY(clientRect, fixWidth)) gModifyViewsY = true;
+        }
+
+        if(MouseJustUp(MOUSE_BUTTON_LEFT))
+        {
+            if(gModifyViewsX) { gDivisorX = gNewDivisorX; gModifyViewsX = false; }
+            if(gModifyViewsY) { gDivisorY = gNewDivisorY; gModifyViewsY = false; }
             RecalculateViewDimensions(views, clientRect);
         }
 
-        if(modifyViewsX)
+        if(gModifyViewsX)
         {
-            i32 mouseRelX = mouseX - fixWidth;
-            newDivisorX = Clamp(mouseRelX / clientRect.w, 0.1f, 0.9f);
+            i32 mouseRelX = MouseX() - fixWidth;
+            gNewDivisorX = Clamp(mouseRelX / clientRect.w, 0.1f, 0.9f);
         }
 
-        if(modifyViewsY)
+        if(gModifyViewsY)
         {
-            i32 mouseRelY = mouseY;
-            newDivisorY = Clamp(mouseRelY / clientRect.h, 0.1f, 0.9f);
+            i32 mouseRelY = MouseY();
+            gNewDivisorY = Clamp(mouseRelY / clientRect.h, 0.1f, 0.9f);
         }
 
-        if(resizeWidth != 0 && resizeHeight != 0)
+        if(gResizeWidth != 0 && gResizeHeight != 0)
         {
             ResizeD3D11();
-            cbuffer.proj = Mat4Ortho(0.0f, (f32)resizeWidth, 0.0f, (f32)resizeHeight, 0.0f, 100.0f);
-            UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
+            cbuffer.proj = Mat4Ortho(0.0f, (f32)gResizeWidth, 0.0f, (f32)gResizeHeight, 0.0f, 100.0f);
+            UpdateConstBuffer(&gConstBuffer, (void *)&cbuffer);
            
-            clientWidth = (resizeWidth - fixWidth);
+            clientWidth = (gResizeWidth - fixWidth);
             if(clientWidth > 0)
             {
-                uiRect = {0, 0, fixWidth, (f32)resizeHeight};
-                clientRect = {fixWidth, 0, clientWidth, (f32)resizeHeight};
+                uiRect = {0, 0, fixWidth, (f32)gResizeHeight};
+                clientRect = {fixWidth, 0, clientWidth, (f32)gResizeHeight};
                 RecalculateViewDimensions(views, clientRect);
             }
 
-            currentWindowWidth = resizeWidth;
-            currentWindowHeight = resizeHeight;
-            resizeWidth = resizeHeight = 0;
+            gCurrentWindowWidth = gResizeWidth;
+            gCurrentWindowHeight = gResizeHeight;
+            gResizeWidth = gResizeHeight = 0;
         }        
 
         for(i32 i = 0; i < 4; ++i)
@@ -416,7 +386,7 @@ int main()
 
             ImGui::Begin("Hello, world!", 0, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoCollapse); // Create a window called "Hello, world!" and append into it.
 
-            ImGui::SetWindowSize(ImVec2(fixWidth, currentWindowHeight));
+            ImGui::SetWindowSize(ImVec2(fixWidth, gCurrentWindowHeight));
             ImGui::SetWindowPos(ImVec2(0, 0));
 
             ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
@@ -451,16 +421,16 @@ int main()
         u32 stride = sizeof(Vertex);
         u32 offset = 0;
         deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        deviceContext->IASetInputLayout(vertexBuffer.layout);
-        deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer.GPUBuffer, &stride, &offset);
+        deviceContext->IASetInputLayout(gVertexBuffer.layout);
+        deviceContext->IASetVertexBuffers(0, 1, &gVertexBuffer.GPUBuffer, &stride, &offset);
         deviceContext->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
         
         float clearColor[] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
         deviceContext->ClearRenderTargetView(renderTargetView, clearColor);
         deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
 
-        deviceContext->VSSetShader(texShader.vertex, 0, 0);
-        deviceContext->PSSetShader(texShader.fragment, 0, 0);
+        deviceContext->VSSetShader(gTexShader.vertex, 0, 0);
+        deviceContext->PSSetShader(gTexShader.fragment, 0, 0);
 
         // Render the for Views
         for(i32 i = 0; i < 4; ++i)
@@ -468,32 +438,32 @@ int main()
             deviceContext->PSSetShaderResources(0, 1, &views[i].fb.shaderResourceView);
             cbuffer.world = Mat4Translate(clientRect.x + views[i].x,
                                           clientRect.y + views[i].y, 1) * Mat4Scale(views[i].w, views[i].h, 1);
-            UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
-            deviceContext->Draw(vertexBuffer.verticesCount, 0);
+            UpdateConstBuffer(&gConstBuffer, (void *)&cbuffer);
+            deviceContext->Draw(gVertexBuffer.verticesCount, 0);
         }
 
-        if(modifyViewsX)
+        if(gModifyViewsX)
         {
             // draw the mouse position 
-            deviceContext->VSSetShader(colShader.vertex, 0, 0);
-            deviceContext->PSSetShader(colShader.fragment, 0, 0);
+            deviceContext->VSSetShader(gColShader.vertex, 0, 0);
+            deviceContext->PSSetShader(gColShader.fragment, 0, 0);
 
             // Horizontal line
-            cbuffer.world = Mat4Translate(clientRect.x + clientRect.w * newDivisorX,
+            cbuffer.world = Mat4Translate(clientRect.x + clientRect.w * gNewDivisorX,
                                           clientRect.y + clientRect.h*0.5f, 0.0f) * Mat4Scale(3, clientRect.h, 1);
-            UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
-            deviceContext->Draw(vertexBuffer.verticesCount, 0);
+            UpdateConstBuffer(&gConstBuffer, (void *)&cbuffer);
+            deviceContext->Draw(gVertexBuffer.verticesCount, 0);
         }
-        if(modifyViewsY)
+        if(gModifyViewsY)
         {
             // draw the mouse position 
-            deviceContext->VSSetShader(colShader.vertex, 0, 0);
-            deviceContext->PSSetShader(colShader.fragment, 0, 0);
+            deviceContext->VSSetShader(gColShader.vertex, 0, 0);
+            deviceContext->PSSetShader(gColShader.fragment, 0, 0);
             // Vertical line
             cbuffer.world = Mat4Translate(clientRect.x + clientRect.w*0.5f,
-                                          clientRect.y + clientRect.h * (1.0f-newDivisorY), 0.0f) * Mat4Scale(clientRect.w, 3, 1);
-            UpdateConstBuffer(&constBuffer, (void *)&cbuffer);
-            deviceContext->Draw(vertexBuffer.verticesCount, 0);
+                                          clientRect.y + clientRect.h * (1.0f-gNewDivisorY), 0.0f) * Mat4Scale(clientRect.w, 3, 1);
+            UpdateConstBuffer(&gConstBuffer, (void *)&cbuffer);
+            deviceContext->Draw(gVertexBuffer.verticesCount, 0);
         }
 
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -507,10 +477,10 @@ int main()
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
-    UnloadVertexBuffer(&vertexBuffer);
-    UnloadShader(&colShader);
-    UnloadShader(&texShader);
-    UnloadConstBuffer(&constBuffer);
+    UnloadVertexBuffer(&gVertexBuffer);
+    UnloadShader(&gColShader);
+    UnloadShader(&gTexShader);
+    UnloadConstBuffer(&gConstBuffer);
     
     for(i32 i = 0; i < 4; ++i)
     {

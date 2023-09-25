@@ -18,8 +18,8 @@ void SetupFrontView(View *view)
 void ProcessFrontView(View *view)
 {
     // TODO: get the mouse relative to the view
-    i32 mouseRelToClientX = mouseX - 200; // TODO: use a global for this value
-    i32 mouseRelToClientY = currentWindowHeight - mouseY;
+    i32 mouseRelToClientX = MouseX() - 200; // TODO: use a global for this value
+    i32 mouseRelToClientY = gCurrentWindowHeight - MouseY();
 
     i32 mouseRelX = mouseRelToClientX - view->x;
     i32 mouseRelY = mouseRelToClientY - view->y;
@@ -27,11 +27,11 @@ void ProcessFrontView(View *view)
     if(mouseRelX >= view->w*-0.5f && mouseRelX <= view->w*0.5f &&
        mouseRelY >= view->h*-0.5f && mouseRelY <= view->h*0.5f)
     {
-        gFrontViewWheelOffset += (f32)mouseWheelDelta;
+        gFrontViewWheelOffset += (f32)MouseWheelDelta();
         gFrontViewWheelOffset = Clamp(gFrontViewWheelOffset, 0.0f, 50.0f);
         gFrontViewZoom = Remap(0.0f, 50.0f, 0.05f, 1.0f, gFrontViewWheelOffset);
 
-        if(MouseJustDown())
+        if(MouseJustDown(MOUSE_BUTTON_RIGHT))
         {
             gFrontViewHot = true;
             gFrontViewLastClickX = mouseRelX;
@@ -39,7 +39,7 @@ void ProcessFrontView(View *view)
         }
     }
 
-    if(MouseJustUp() && gFrontViewHot)
+    if(MouseJustUp(MOUSE_BUTTON_RIGHT) && gFrontViewHot)
     {
         gFrontViewHot = false;
     }
@@ -56,21 +56,21 @@ void ProcessFrontView(View *view)
 void RenderFrontView(View *view)
 {
     // set the shader
-    deviceContext->VSSetShader(colShader.vertex, 0, 0);
-    deviceContext->PSSetShader(colShader.fragment, 0, 0);
+    deviceContext->VSSetShader(gColShader.vertex, 0, 0);
+    deviceContext->PSSetShader(gColShader.fragment, 0, 0);
 
     f32 viewUnit = gViewMaxZoom * gFrontViewZoom;
     
     // Update the constBuffer
     view->cbuffer.view = Mat4LookAt({0, 0, -50}, {0, 0, 0}, {0, 1, 0});
-    UpdateConstBuffer(&constBuffer, (void *)&view->cbuffer);
+    UpdateConstBuffer(&gConstBuffer, (void *)&view->cbuffer);
     Draw2dGrid(gFrontViewOffsetX, gFrontViewOffsetY, view->w, view->h, viewUnit);
 
     // Update the view matrix
     view->cbuffer.view = Mat4LookAt({-gFrontViewOffsetX, -gFrontViewOffsetY, -50},
                                     {-gFrontViewOffsetX, -gFrontViewOffsetY, 0},
                                     {0, 1, 0});
-    UpdateConstBuffer(&constBuffer, (void *)&view->cbuffer);
+    UpdateConstBuffer(&gConstBuffer, (void *)&view->cbuffer);
     DrawLine(0, 0, 0, viewUnit, 0, 0, 0xFFFF0000);
     DrawLine(0, 0, 0, 0, viewUnit, 0, 0xFF00FF00);
     LineRendererDraw();

@@ -1,3 +1,48 @@
+static void AddFrontAndTopViewsPolys(Vec2 startP, Vec2 endP)
+{
+    Poly2D poly;
+
+    Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
+    poly.vertices[0] = {0, endP.y};
+    poly.vertices[1] = {64.0f, endP.y};
+    poly.vertices[2] = {64.0f, startP.y};
+    poly.vertices[3] = {0, startP.y};
+    poly.verticesCount = 4;
+    ASSERT(frontStorage->polygonsCount < ARRAY_LENGTH(frontStorage->polygons));
+    frontStorage->polygons[frontStorage->polygonsCount++] = poly;
+    
+    Poly2DStorage *topStorage = gSharedMemory.poly2dStorage + VIEW_TOP;
+    poly.vertices[0] = {0, endP.x};
+    poly.vertices[1] = {64.0f, endP.x};
+    poly.vertices[2] = {64.0f, startP.x};
+    poly.vertices[3] = {0, startP.x};
+    poly.verticesCount = 4;
+    ASSERT(topStorage->polygonsCount < ARRAY_LENGTH(topStorage->polygons));
+    topStorage->polygons[topStorage->polygonsCount++] = poly;
+}
+
+static void UpdateFrontAndTopViewsPolys(RectMinMax rect, i32 quadIndex)
+{
+    Poly2D poly;
+
+    Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT; 
+    poly.vertices[0] = {0, rect.max.y};
+    poly.vertices[1] = {64.0f, rect.max.y};
+    poly.vertices[2] = {64.0f, rect.min.y};
+    poly.vertices[3] = {0, rect.min.y};
+    poly.verticesCount = 4;
+    frontStorage->polygons[quadIndex] = poly;
+    
+    Poly2DStorage *topStorage = gSharedMemory.poly2dStorage + VIEW_TOP;
+    poly.vertices[0] = {0, rect.max.x};
+    poly.vertices[1] = {64.0f, rect.max.x};
+    poly.vertices[2] = {64.0f, rect.min.x};
+    poly.vertices[3] = {0, rect.min.x};
+    poly.verticesCount = 4;
+    topStorage->polygons[quadIndex] = poly;
+}
+
+
 void SetupSideView(View *view)
 {
     view->id = VIEW_SIDE;
@@ -31,6 +76,7 @@ void ProcessSideView(View *view)
             f32 startY = floorf(mouseWorldY / 64.0f) * 64.0f;
             startP = {startX, startY};
             quadIndex = ViewAddQuad(view, startP, {startP.x + 64.0f, startP.y + 64.0f});
+            AddFrontAndTopViewsPolys(startP,  {startP.x + 64.0f, startP.y + 64.0f});
         }
         
         if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown)
@@ -45,6 +91,7 @@ void ProcessSideView(View *view)
             rect.max.x = Max(startP.x, endP.x) + 64.0f;
             rect.max.y = Max(startP.y, endP.y) + 64.0f;
             ViewUpdateQuad(view, rect.min, rect.max, quadIndex);
+            UpdateFrontAndTopViewsPolys(rect, quadIndex);
         }
         
         if(state->leftButtonDown)
@@ -60,6 +107,7 @@ void ProcessSideView(View *view)
             rect.max.x = Max(startP.x, endP.x) + 64.0f;
             rect.max.y = Max(startP.y, endP.y) + 64.0f;
             ViewUpdateQuad(view, rect.min, rect.max, quadIndex);
+            UpdateFrontAndTopViewsPolys(rect, quadIndex);
         }
     }
 

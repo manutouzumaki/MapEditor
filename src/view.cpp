@@ -12,10 +12,10 @@ enum ProjType
 
 enum ViewId
 {
-    VIEW_MAIN,
     VIEW_TOP,
     VIEW_FRONT,
     VIEW_SIDE,
+    VIEW_MAIN,
 
     VIEW_COUNT
 };

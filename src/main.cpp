@@ -56,53 +56,6 @@ static Vertex gQuad[] = {
 #include "line.cpp"
 #include "view.cpp"
 
-void Draw2dGrid(f32 offsetX, f32 offsetY,
-                f32 width, f32 height, f32 zoom)
-{
-    // Only for debug
-    f32 tileSize = zoom;
-    f32 tileCountX = (width / tileSize) + 1;
-    f32 tileCountY = (height / tileSize) + 1;
-    u32 color = 0xFF333333;
-
-    f32 currentX = 0 + fmod(offsetX, tileSize);
-    for(i32 x = 0; x < tileCountX/2; ++x)
-    {
-        DrawLine(currentX, height*-0.5f, 0,
-                 currentX, height* 0.5f, 0,
-                 color);
-        currentX += tileSize;
-    }
-    currentX = 0 + fmod(offsetX, tileSize);
-    for(i32 x = 0; x < tileCountX/2; ++x)
-    {
-        DrawLine(currentX, height*-0.5f, 0,
-                 currentX, height* 0.5f, 0,
-                 color);
-        currentX -= tileSize;
-    }
-
-
-    f32 currentY = 0 + fmod(offsetY, tileSize);
-    for(i32 y = 0; y < tileCountY/2; ++y)
-    {
-        DrawLine(width*-0.5f, currentY, 0,
-                 width* 0.5f, currentY, 0,
-                 color);
-        currentY += tileSize;
-    }
-    currentY = 0 + fmod(offsetY, tileSize);
-    for(i32 y = 0; y < tileCountY/2; ++y)
-    {
-        DrawLine(width*-0.5f, currentY, 0,
-                 width* 0.5f, currentY, 0,
-                 color);
-        currentY -= tileSize;
-    }
-
-    LineRendererDraw();
-}
-
 #include "mainView.cpp"
 #include "frontView.cpp"
 #include "topView.cpp"

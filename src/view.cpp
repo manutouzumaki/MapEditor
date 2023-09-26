@@ -10,12 +10,36 @@ enum ProjType
     PROJ_TYPE_ORTHO
 };
 
+struct ViewPerspState
+{
+
+};
+
+struct ViewOrthoState
+{
+    f32 offsetX;
+    f32 offsetY;
+
+    f32 lastClickX;
+    f32 lastClickY;
+
+    f32 wheelOffset;
+    f32 zoom;
+
+    bool isHot;
+};
+
 struct View
 {
     f32 x, y, w, h;
     CBuffer cbuffer;
     FrameBuffer fb;
     ProjType projType;
+    union
+    {
+        ViewPerspState perspState;
+        ViewOrthoState orthoState;
+    };
 
     SetupFNP setup;
     ProcessFNP process;
@@ -122,4 +146,161 @@ void ViewRender(View *view)
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     deviceContext->RSSetViewports(1, &viewport);
+}
+
+void WorldToScreen(f32 wx, f32 wy, f32 &sx, f32 &sy, f32 offsetX, f32 offsetY, f32 zoom)
+{
+    sx = (wx - offsetX) * zoom;
+    sy = (wy - offsetY) * zoom;
+}
+
+void ScreenToWorld(f32 sx, f32 sy, f32 &wx, f32 &wy, f32 offsetX, f32 offsetY, f32 zoom)
+{
+    wx = (sx / zoom) + offsetX;
+    wy = (sy / zoom) + offsetY;
+}
+
+i32 MouseRelToClientX()
+{
+    i32 mouseRelToClientX = MouseX() - 200; // TODO: use a global for this value
+    return mouseRelToClientX;
+}
+
+i32 MouseRelToClientY()
+{
+    i32 mouseRelToClientY = gCurrentWindowHeight - MouseY();
+    return mouseRelToClientY;
+}
+
+i32 MouseRelX(View *view)
+{
+    i32 mouseRelToClientX = MouseRelToClientX();
+    i32 mouseRelX = mouseRelToClientX - view->x;
+    return mouseRelX;
+}
+
+i32 MouseRelY(View *view)
+{
+    i32 mouseRelToClientY = MouseRelToClientY();
+    i32 mouseRelY = mouseRelToClientY - view->y;
+    return mouseRelY;
+}
+
+bool MouseIsHot(View *view)
+{
+    i32 mouseRelX = MouseRelX(view);
+    i32 mouseRelY = MouseRelY(view);
+    if(mouseRelX >= view->w*-0.5f && mouseRelX <= view->w*0.5f &&
+       mouseRelY >= view->h*-0.5f && mouseRelY <= view->h*0.5f)
+    {
+        return true;
+    }
+    return false;
+}
+
+void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
+{
+    for(f32 y = -100.0f; y < 100.0f; ++y)
+    {
+        f32 ax = -100.0f * 64;
+        f32 ay = y * 64;
+        f32 bx = 100.0f * 64;
+        f32 by = y * 64;
+        
+        f32 sax, say, sbx, sby;
+
+        WorldToScreen(ax, ay, sax, say, offsetX, offsetY, zoom); 
+        WorldToScreen(bx, by, sbx, sby, offsetX, offsetY, zoom); 
+
+        DrawLine(sax,  say, 0, sbx,  sby, 0, 0xFF333333);
+    }
+
+    for(f32 x = -100.0f; x < 100.0f; ++x)
+    {
+
+        f32 ax = x * 64;
+        f32 ay = -100.0f * 64.0f;
+        f32 bx = x * 64;
+        f32 by = 64.f*100.0f;
+        
+        f32 sax, say, sbx, sby;
+
+        WorldToScreen(ax, ay, sax, say, offsetX, offsetY, zoom); 
+        WorldToScreen(bx, by, sbx, sby, offsetX, offsetY, zoom); 
+
+        DrawLine(sax,  say, 0, sbx,  sby, 0, 0xFF333333);
+    }
+}
+
+void ViewOrthoBaseSetup(View *view)
+{
+    ViewOrthoState *state = &view->orthoState;
+    state->wheelOffset = 5.0f;
+    state->zoom = Remap(0.0f, 50.0f, 0.05f, 10.0f, state->wheelOffset);
+}
+
+void ViewOrthoBaseProcess(View *view)
+{
+    ViewOrthoState *state = &view->orthoState;
+
+    i32 mouseRelX = MouseRelX(view);
+    i32 mouseRelY = MouseRelY(view);
+
+    if(MouseIsHot(view))
+    {
+        if(MouseJustDown(MOUSE_BUTTON_RIGHT))
+        {
+            state->isHot = true;
+            state->lastClickX = mouseRelX;
+            state->lastClickY = mouseRelY;
+        }
+
+        f32 mouseWorldPreZoomX, mouseWorldPreZoomY;
+        ScreenToWorld(mouseRelX, mouseRelY, mouseWorldPreZoomX, mouseWorldPreZoomY,
+                      state->offsetX, state->offsetY, state->zoom);
+
+        i32 mouseWheelDelta = MouseWheelDelta();
+        if(mouseWheelDelta != 0)
+        {
+            state->wheelOffset += (f32)mouseWheelDelta;
+            state->wheelOffset = Clamp(state->wheelOffset, 0.0f, 50.0f);
+            state->zoom = Remap(0.0f, 50.0f, 0.2f, 10.0f, state->wheelOffset);
+        }
+
+        f32 mouseWorldPostZoomX, mouseWorldPostZoomY;
+        ScreenToWorld(mouseRelX, mouseRelY, mouseWorldPostZoomX, mouseWorldPostZoomY,
+                      state->offsetX, state->offsetY, state->zoom);
+
+        state->offsetX += (mouseWorldPreZoomX - mouseWorldPostZoomX);
+        state->offsetY += (mouseWorldPreZoomY - mouseWorldPostZoomY);
+    }
+    
+    if(MouseJustUp(MOUSE_BUTTON_RIGHT) && state->isHot)
+    {
+        state->isHot = false;
+    }
+
+    if(state->isHot)
+    {
+        state->offsetX += (state->lastClickX - mouseRelX) / state->zoom;
+        state->offsetY += (state->lastClickY - mouseRelY) / state->zoom;
+        state->lastClickX = mouseRelX;
+        state->lastClickY = mouseRelY;
+    }
+}
+
+void ViewOrthoBaseRender(View *view)
+{
+    ViewOrthoState *state = &view->orthoState;
+    // set the shader
+    deviceContext->VSSetShader(gColShader.vertex, 0, 0);
+    deviceContext->PSSetShader(gColShader.fragment, 0, 0);
+
+    // Update the constBuffer
+    view->cbuffer.world = Mat4Identity();
+    view->cbuffer.view = Mat4LookAt({0, 0, -50}, {0, 0, 0}, {0, 1, 0});
+    UpdateConstBuffer(&gConstBuffer, (void *)&view->cbuffer);
+        
+    RenderGrid(state->offsetX, state->offsetY, state->zoom);
+    LineRendererDraw();
 }

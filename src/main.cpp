@@ -268,11 +268,6 @@ int main()
         InputPrepareForFrame();
         FlushEvents(window);
 
-        if(MouseJustUp(MOUSE_BUTTON_MIDDLE))
-        {
-            printf("middle just up\n");
-        }
-
         if(MouseJustDown(MOUSE_BUTTON_LEFT))
         {
             if(MouseInDivisorX(clientRect, fixWidth)) gModifyViewsX = true;

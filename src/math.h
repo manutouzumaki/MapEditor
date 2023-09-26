@@ -12,6 +12,19 @@
 #define VEC_EPSILON 0.000001f
 #define MAT_EPSILON 0.000001f
 
+f32 Min(f32 a, f32 b)
+{
+    if(a < b) return a;
+    return b;
+}
+
+
+f32 Max(f32 a, f32 b)
+{
+    if(a > b) return a;
+    return b;
+}
+
 f32 Clamp(f32 v, f32 min, f32 max)
 {
     if(v <= min) return min;

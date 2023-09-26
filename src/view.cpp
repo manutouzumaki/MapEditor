@@ -10,6 +10,16 @@ enum ProjType
     PROJ_TYPE_ORTHO
 };
 
+enum ViewId
+{
+    VIEW_MAIN,
+    VIEW_TOP,
+    VIEW_FRONT,
+    VIEW_SIDE,
+
+    VIEW_COUNT
+};
+
 struct ViewPerspState
 {
 
@@ -26,11 +36,14 @@ struct ViewOrthoState
     f32 wheelOffset;
     f32 zoom;
 
-    bool isHot;
+    bool leftButtonDown;
+    bool middleButtonDown;
+    bool rightButtonDown;
 };
 
 struct View
 {
+    ViewId id;
     f32 x, y, w, h;
     CBuffer cbuffer;
     FrameBuffer fb;
@@ -46,8 +59,27 @@ struct View
     RenderFNP render;
 };
 
-static f32 gViewMaxZoom = 128.0f;
-static f32 gViewUnitSize = 64.0f;
+
+// TODO: use a link list base storage system
+struct Poly2DStorage
+{
+    Poly2D polygons[255];
+    i32 polygonsCount;
+};
+
+struct PolyPlaneStorage
+{
+    PolyPlane polygons[255];
+    i32 polygonsCount;
+};
+
+struct SharedMemory
+{
+    Poly2DStorage poly2dStorage[3];
+    PolyPlaneStorage polyPlaneStorage;
+};
+
+static SharedMemory gSharedMemory;
 
 View ViewCreate(f32 x, f32 y, f32 w, f32 h, ProjType projType,
                 SetupFNP setup,
@@ -230,6 +262,24 @@ void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
 
         DrawLine(sax,  say, 0, sbx,  sby, 0, 0xFF333333);
     }
+
+    f32 ax = 0;
+    f32 ay = -100.0f * 64.0f;
+    f32 bx = 0;
+    f32 by = 64.f*100.0f;
+    f32 sax, say, sbx, sby;
+    WorldToScreen(ax, ay, sax, say, offsetX, offsetY, zoom); 
+    WorldToScreen(bx, by, sbx, sby, offsetX, offsetY, zoom); 
+    DrawLine(sax,  say, 0, sbx,  sby, 0, 0xFFAAFFAA);
+
+    ax = -100.0f * 64.0f;
+    ay = 0;
+    bx =  100.0f * 64.0f;
+    by = 0;
+    WorldToScreen(ax, ay, sax, say, offsetX, offsetY, zoom); 
+    WorldToScreen(bx, by, sbx, sby, offsetX, offsetY, zoom); 
+    DrawLine(sax,  say, 0, sbx,  sby, 0, 0xFFFFAAAA);
+
 }
 
 void ViewOrthoBaseSetup(View *view)
@@ -248,9 +298,9 @@ void ViewOrthoBaseProcess(View *view)
 
     if(MouseIsHot(view))
     {
-        if(MouseJustDown(MOUSE_BUTTON_RIGHT))
+        if(MouseJustDown(MOUSE_BUTTON_MIDDLE))
         {
-            state->isHot = true;
+            state->middleButtonDown = true;
             state->lastClickX = mouseRelX;
             state->lastClickY = mouseRelY;
         }
@@ -275,12 +325,12 @@ void ViewOrthoBaseProcess(View *view)
         state->offsetY += (mouseWorldPreZoomY - mouseWorldPostZoomY);
     }
     
-    if(MouseJustUp(MOUSE_BUTTON_RIGHT) && state->isHot)
+    if(MouseJustUp(MOUSE_BUTTON_MIDDLE) && state->middleButtonDown)
     {
-        state->isHot = false;
+        state->middleButtonDown = false;
     }
 
-    if(state->isHot)
+    if(state->middleButtonDown)
     {
         state->offsetX += (state->lastClickX - mouseRelX) / state->zoom;
         state->offsetY += (state->lastClickY - mouseRelY) / state->zoom;
@@ -303,4 +353,65 @@ void ViewOrthoBaseRender(View *view)
         
     RenderGrid(state->offsetX, state->offsetY, state->zoom);
     LineRendererDraw();
+}
+
+Poly2DStorage *ViewGetPoly2DStorage(View *view)
+{
+    Poly2DStorage *poly2dStorage = gSharedMemory.poly2dStorage + view->id;
+    return poly2dStorage;
+}
+
+i32 ViewAddQuad(View *view, Vec2 start, Vec2 end)
+{
+    Poly2DStorage *poly2dStorage = ViewGetPoly2DStorage(view);
+
+    Poly2D poly;
+    poly.vertices[0] = {start.x, start.y};
+    poly.vertices[1] = {end.x, start.y};
+    poly.vertices[2] = {end.x, end.y};
+    poly.vertices[3] = {start.x, end.y};
+    poly.verticesCount = 4;
+
+    ASSERT(poly2dStorage->polygonsCount < ARRAY_LENGTH(poly2dStorage->polygons));
+    i32 index = poly2dStorage->polygonsCount++;
+    poly2dStorage->polygons[index] = poly;
+
+    return index;
+}
+
+void ViewUpdateQuad(View *view, Vec2 start, Vec2 end, i32 index)
+{
+    Poly2DStorage *poly2dStorage = ViewGetPoly2DStorage(view);
+
+    Poly2D poly;
+    poly.vertices[0] = {start.x, start.y};
+    poly.vertices[1] = {end.x, start.y};
+    poly.vertices[2] = {end.x, end.y};
+    poly.vertices[3] = {start.x, end.y};
+    poly.verticesCount = 4;
+
+    poly2dStorage->polygons[index] = poly;
+}
+
+void RenderPoly2D(View *view, Poly2D *poly, u32 color)
+{
+    ViewOrthoState *state = &view->orthoState;
+    for(i32 i = 0; i < poly->verticesCount - 1; ++i)
+    {
+        Vec2 a = poly->vertices[i + 0];
+        Vec2 b = poly->vertices[i + 1];
+
+        f32 sax, say, sbx, sby;
+        WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
+        WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
+
+        DrawLine(sax,  say, 0, sbx,  sby, 0, color);
+    }
+
+    Vec2 a = poly->vertices[poly->verticesCount - 1];
+    Vec2 b = poly->vertices[0];
+    f32 sax, say, sbx, sby;
+    WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
+    WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
+    DrawLine(sax,  say, 0, sbx,  sby, 0, color);
 }

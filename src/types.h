@@ -63,15 +63,39 @@ struct Rect
     f32 w, h;
 };
 
+// TODO: fix this 
 struct RectMinMax
 {
-    f32 minX, minY;
-    f32 maxX, maxY;
+    union
+    {
+        struct
+        {
+            f32 minX, minY;
+            f32 maxX, maxY;
+        };
+        struct
+        {
+            Vec2 min;
+            Vec2 max;
+        };
+    };
+};
+
+struct Plane
+{
+    Vec3 n;
+    f32 d;
+};
+
+struct PolyPlane
+{
+    Plane planes[255];
+    i32 planesCount;
 };
 
 struct Poly2D
 {
-    Vec2 *vertices;
+    Vec2 vertices[255];
     i32 verticesCount;
 };
 

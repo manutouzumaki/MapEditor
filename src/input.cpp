@@ -47,6 +47,11 @@ i32 MouseWheelDelta()
     return gInput.wheelDelta;
 }
 
+bool MouseIsDown(i32 mouseButton)
+{
+    return gInput.buttons[mouseButton].down;
+}
+
 bool MouseJustDown(i32 mouseButton)
 {
     if(gInput.buttons[mouseButton].down != gInput.buttons[mouseButton].wasDown)

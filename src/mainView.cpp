@@ -1,6 +1,6 @@
 void SetupMainView(View *view)
 {
-
+    view->id = VIEW_MAIN;
 }
 
 void ProcessMainView(View *view)

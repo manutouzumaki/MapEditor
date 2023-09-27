@@ -18,7 +18,6 @@ f32 Min(f32 a, f32 b)
     return b;
 }
 
-
 f32 Max(f32 a, f32 b)
 {
     if(a > b) return a;

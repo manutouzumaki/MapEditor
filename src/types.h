@@ -30,6 +30,18 @@ struct VertexBuffer
     ID3D11InputLayout *layout;
 };
 
+struct DynamicVertexBuffer
+{
+    ID3D11Buffer *GPUBuffer;
+    Vertex *CPUBuffer;
+    u32 verticesCount;
+
+    ID3D11InputLayout *layout;
+
+    size_t size;
+    size_t used;
+};
+
 struct FrameBuffer
 {
     // TODO: MOVE the x ,y,w and h to view structure
@@ -42,6 +54,7 @@ struct FrameBuffer
     ID3D11Texture2D *texture;
     ID3D11RenderTargetView *renderTargetView;
     ID3D11ShaderResourceView *shaderResourceView;
+    ID3D11DepthStencilView* depthStencilView;
 };
 
 struct File

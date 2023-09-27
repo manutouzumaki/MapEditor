@@ -91,6 +91,7 @@ void ProcessFrontView(View *view)
             rect.max.y = Max(startP.y, endP.y) + 64.0f;
             ViewUpdateQuad(view, rect.min, rect.max, quadIndex);
             UpdateSideAndTopViewsPolys(rect, quadIndex);
+            ViewAddPolyPlane();
         }
         
         if(state->leftButtonDown)

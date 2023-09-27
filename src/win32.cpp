@@ -544,6 +544,47 @@ void UnloadVertexBuffer(VertexBuffer *vertexBuffer)
     vertexBuffer->verticesCount = 0;
 }
 
+DynamicVertexBuffer LoadDynamicVertexBuffer(size_t size, ID3D11InputLayout *layout)
+{
+    DynamicVertexBuffer buffer = {};
+    buffer.size = size;
+    buffer.used = 0;
+    buffer.verticesCount = 0;
+    buffer.layout = layout;
+
+    D3D11_BUFFER_DESC vertexDesc;
+    ZeroMemory(&vertexDesc, sizeof(vertexDesc));
+    vertexDesc.Usage = D3D11_USAGE_DYNAMIC;
+    vertexDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    vertexDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    vertexDesc.ByteWidth = size;
+
+    HRESULT result = device->CreateBuffer(&vertexDesc, NULL, &buffer.GPUBuffer);
+    buffer.CPUBuffer = (Vertex *)malloc(size);
+
+    return buffer;
+}
+
+void PushToGPUDynamicVertexBuffer(DynamicVertexBuffer *vertexBuffer)
+{
+    D3D11_MAPPED_SUBRESOURCE bufferData;
+    ZeroMemory(&bufferData, sizeof(bufferData));
+    deviceContext->Map(vertexBuffer->GPUBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &bufferData);
+    memcpy(bufferData.pData, vertexBuffer->CPUBuffer, vertexBuffer->used);
+    deviceContext->Unmap(vertexBuffer->GPUBuffer, 0);
+}
+
+void UnloadDynamicVertexBuffer(DynamicVertexBuffer *vertexBuffer)
+{
+    if(vertexBuffer->GPUBuffer) vertexBuffer->GPUBuffer->Release();
+    if(vertexBuffer->CPUBuffer) free(vertexBuffer->CPUBuffer);
+    vertexBuffer->verticesCount = 0;
+    vertexBuffer->size = 0;
+    vertexBuffer->used = 0;
+}
+
+
+
 FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT format)
 {
     FrameBuffer frameBuffer = {};
@@ -593,6 +634,42 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     {
         printf("Error creating FrameBuffer srv\n");
         ASSERT(!"INVALID_CODE_PATH");
+    }
+
+    // create the depth stencil texture
+    ID3D11Texture2D* depthStencilTexture = 0;
+    D3D11_TEXTURE2D_DESC depthStencilTextureDesc;
+    depthStencilTextureDesc.Width = width;
+    depthStencilTextureDesc.Height = height;
+    depthStencilTextureDesc.MipLevels = 1;
+    depthStencilTextureDesc.ArraySize = 1;
+    depthStencilTextureDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    depthStencilTextureDesc.SampleDesc.Count = 1;
+    depthStencilTextureDesc.SampleDesc.Quality = 0;
+    depthStencilTextureDesc.Usage = D3D11_USAGE_DEFAULT;
+    depthStencilTextureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+    depthStencilTextureDesc.CPUAccessFlags = 0;
+    depthStencilTextureDesc.MiscFlags = 0;
+ 
+    // create the depth stencil view
+    if(FAILED(device->CreateTexture2D(&depthStencilTextureDesc, NULL, &depthStencilTexture)))
+    {
+        printf("Error creating FrameBuffer depthStencilTexture\n");
+        ASSERT(!"INVALID_CODE_PATH");
+    }
+    D3D11_DEPTH_STENCIL_VIEW_DESC descDSV = {};
+    descDSV.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    descDSV.Texture2D.MipSlice = 0;
+
+    if(FAILED(device->CreateDepthStencilView(depthStencilTexture, &descDSV, &frameBuffer.depthStencilView)))
+    {
+        printf("Error creating FrameBuffer dsv\n");
+        ASSERT(!"INVALID_CODE_PATH");
+    }
+    if (depthStencilTexture)
+    {
+        depthStencilTexture->Release();
     }
     
     return frameBuffer;

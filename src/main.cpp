@@ -40,6 +40,7 @@ static Shader gColShader;
 static Shader gTexShader;
 static ConstBuffer gConstBuffer;
 static VertexBuffer gVertexBuffer;
+static DynamicVertexBuffer gDynamicVertexBuffer;
 static Vertex gQuad[] = {
     // Face 1
     {{-0.5f, -0.5f, 0}, {1, 1, 0, 1}, {0, 1}},
@@ -187,6 +188,7 @@ int main()
 
     // Load Vertex Buffer
     gVertexBuffer = LoadVertexBuffer(gQuad, ARRAY_LENGTH(gQuad), layout);
+    gDynamicVertexBuffer = LoadDynamicVertexBuffer(13770*sizeof(Vertex), layout); // TODO: set the size better
 
     // Load FrameBuffer
     f32 fixWidth = 200.0f;
@@ -426,6 +428,7 @@ int main()
     ImGui::DestroyContext();
 
     UnloadVertexBuffer(&gVertexBuffer);
+    UnloadDynamicVertexBuffer(&gDynamicVertexBuffer);
     UnloadShader(&gColShader);
     UnloadShader(&gTexShader);
     UnloadConstBuffer(&gConstBuffer);

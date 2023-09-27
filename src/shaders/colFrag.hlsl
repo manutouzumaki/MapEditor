@@ -6,6 +6,6 @@ struct FragmentIn
 
 float4 fs_main(FragmentIn i) : SV_TARGET
 {
-    //return i.col;
-    return float4(0.8, 0.8, 0.8, 1);
+    return i.col;
+    //return float4(0.6, 0.6, 1, 1);
 }

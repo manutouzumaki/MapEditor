@@ -97,14 +97,14 @@ View ViewCreate(f32 x, f32 y, f32 w, f32 h, ProjType projType,
     {
         case PROJ_TYPE_PERSP:
         {
-            view.cbuffer.proj = Mat4Perspective(60, w/h, 0.01f, 100.0f);
+            view.cbuffer.proj = Mat4Perspective(60, w/h, 0.01f, 1000.0f);
         } break;
         case PROJ_TYPE_ORTHO:
         {
             view.cbuffer.proj = Mat4Ortho(w*-0.5f, w*0.5f, h*-0.5f, h*0.5f, 0.01f, 100.0f);
         } break;
     }
-    view.cbuffer.view = Mat4LookAt({0, 0, -2}, {0, 0, 0}, {0, 1,  0});
+    view.cbuffer.view = Mat4LookAt({0, 2.5f, -5}, {0, 0, 0}, {0, 1,  0});
     view.cbuffer.world = Mat4Identity();
 
     view.fb = LoadFrameBuffer(x, y, w, h, DXGI_FORMAT_R8G8B8A8_UNORM);
@@ -166,8 +166,9 @@ void ViewRender(View *view)
 
     // Clear the screen
     f32 clearColor[] = { 0.05, 0.05, 0.05, 1 };
+    deviceContext->OMSetRenderTargets(1, &view->fb.renderTargetView, view->fb.depthStencilView);
     deviceContext->ClearRenderTargetView(view->fb.renderTargetView, clearColor);
-    deviceContext->OMSetRenderTargets(1, &view->fb.renderTargetView, 0);
+    deviceContext->ClearDepthStencilView(view->fb.depthStencilView, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
 
     if(view->render) view->render(view);
 
@@ -270,7 +271,7 @@ void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
     f32 sax, say, sbx, sby;
     WorldToScreen(ax, ay, sax, say, offsetX, offsetY, zoom); 
     WorldToScreen(bx, by, sbx, sby, offsetX, offsetY, zoom); 
-    DrawLine(sax,  say, 0, sbx,  sby, 0, 0xFFAAFFAA);
+    DrawLine(sax,  say, 0, sbx,  sby, -1, 0xFFAAFFAA);
 
     ax = -100.0f * 64.0f;
     ay = 0;
@@ -278,7 +279,7 @@ void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
     by = 0;
     WorldToScreen(ax, ay, sax, say, offsetX, offsetY, zoom); 
     WorldToScreen(bx, by, sbx, sby, offsetX, offsetY, zoom); 
-    DrawLine(sax,  say, 0, sbx,  sby, 0, 0xFFFFAAAA);
+    DrawLine(sax,  say, 0, sbx,  sby, -1, 0xFFFFAAAA);
 
 }
 
@@ -361,6 +362,229 @@ Poly2DStorage *ViewGetPoly2DStorage(View *view)
     return poly2dStorage;
 }
 
+static bool GetIntersection(Vec3 n1, Vec3 n2, Vec3 n3, f32 d1, f32 d2, f32 d3, Vertex *vertex)
+{
+    f32 denom = Vec3Dot(n1, Vec3Cross(n2, n3));
+    if(denom <= FLT_EPSILON && denom >= -FLT_EPSILON)
+    {
+        return false;
+    }
+    Vec3 pos = (-d1 * Vec3Cross(n2, n3) -d2 * Vec3Cross(n3, n1) -d3 * Vec3Cross(n1, n2)) / denom;
+    f32 r = InvLerp(0, 20, rand()%20);
+    f32 g = InvLerp(0, 20, rand()%20);
+    f32 b = InvLerp(0, 20, rand()%20);
+    Vec4 col = {r, g, b, 1.0f};
+    *vertex = {pos, col};
+    return true;
+}
+
+#include <vector>
+
+struct PolygonData
+{
+    std::vector <Vertex> vertices;
+};
+
+static Plane GetPlaneFromThreePoints(Vec3 a, Vec3 b, Vec3 c)
+{
+    Plane plane;
+    Vec3 ab = b - a;
+    Vec3 ac = c - a;
+    Vec3 n = Vec3Normalized(Vec3Cross(ab, ac));
+    f32 d = -n.x*a.x -n.y*a.y -n.z*a.z;
+    return {n, d};
+}
+
+static Vec3 GetCenterOfPolygon(PolygonData *polygon)
+{
+    Vec3 center = {};
+    for(i32 i = 0; i < polygon->vertices.size(); ++i)
+    {
+        center = center + polygon->vertices[i].position;
+    }
+    center = center / polygon->vertices.size();
+    return center;
+}
+
+void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
+{
+    std::vector<PolygonData> polygons;
+    polygons.resize(poly->planesCount);
+    for(i32 i = 0; i < poly->planesCount - 2; ++i) {
+    for(i32 j = i; j < poly->planesCount - 1; ++j) {
+    for(i32 k = j; k < poly->planesCount - 0; ++k) {
+
+        if(i != j && i != k && j != k)
+        {
+            Plane a = poly->planes[i];
+            Plane b = poly->planes[j];
+            Plane c = poly->planes[k];
+
+            Vertex vertex = {};
+            if(GetIntersection(a.n, b.n, c.n, -a.d, -b.d, -c.d, &vertex))
+            {
+                bool illegal = false;
+                for(i32 m = 0; m < poly->planesCount; ++m)
+                {
+                    Plane plane = poly->planes[m];
+                    f32 dot = Vec3Dot(plane.n, vertex.position);
+                    f32 d = -plane.d;
+                    f32 test = dot + d;
+                    if(test > EPSILON)
+                    {
+                        illegal = true;
+                    }
+                }
+                if(illegal == false)
+                {
+                    // TODO: add the vertex
+                    Mat4 scaleMat = Mat4Scale(1.0f/128.0f, 1.0f/128.0f, 1.0f/128.0f);
+                    vertex.position = Mat4TransformPoint(scaleMat, vertex.position);
+                    polygons[i].vertices.push_back(vertex);
+                    polygons[j].vertices.push_back(vertex);
+                    polygons[k].vertices.push_back(vertex);
+                }
+            }
+        }
+
+    }}}
+
+    // order the vertices in the polygons
+    for(i32 p = 0; p < poly->planesCount; ++p)
+    {
+        Plane polygonPlane = poly->planes[p]; 
+        PolygonData *polygon = polygons.data() + p;
+
+        ASSERT(polygon->vertices.size() >= 3);
+
+        Vec3 center = GetCenterOfPolygon(polygon);
+
+        
+        for(i32 n = 0; n <= polygon->vertices.size() - 3; ++n)
+        {
+            Vec3 a = Vec3Normalized(polygon->vertices[n].position - center);
+            Plane p = GetPlaneFromThreePoints(polygon->vertices[n].position,
+                                              center, center + polygonPlane.n);
+
+            f32 smallestAngle = -1;
+            i32 smallest = -1;
+
+            for(i32 m = n + 1; m <= polygon->vertices.size() - 1; ++m)
+            {
+                Vertex vertex = polygon->vertices[m];
+                if((Vec3Dot(p.n, vertex.position) + p.d) > 0.0f)
+                {
+                    Vec3 b = Vec3Normalized(vertex.position - center);
+                    f32 angle = Vec3Dot(a, b);
+                    if(angle > smallestAngle)
+                    {
+                        smallestAngle = angle;
+                        smallest = m;
+                    }
+                }
+            }
+
+            if(smallest >= 0)
+            {
+                Vertex tmp = polygon->vertices[n + 1];
+                polygon->vertices[n + 1] = polygon->vertices[smallest];
+                polygon->vertices[smallest] = tmp;
+            }
+        } 
+    }
+
+    std::vector<Vertex> vertices;
+    
+    for(i32 i = 0; i < polygons.size(); ++i)
+    {
+        PolygonData *poly = &polygons[i];
+        for(i32 j = 0; j < poly->vertices.size() - 2; ++j)
+        {
+            Vertex a = poly->vertices[0];
+            Vertex b = poly->vertices[j + 1];
+            Vertex c = poly->vertices[j + 2];
+            vertices.push_back(a);
+            vertices.push_back(b);
+            vertices.push_back(c);
+        }
+    }
+
+    ASSERT((gDynamicVertexBuffer.used + sizeof(Vertex)) < gDynamicVertexBuffer.size);
+    memcpy((char *)gDynamicVertexBuffer.CPUBuffer + gDynamicVertexBuffer.used, vertices.data(), vertices.size() * sizeof(Vertex));
+    gDynamicVertexBuffer.used += vertices.size() * sizeof(Vertex);
+    gDynamicVertexBuffer.verticesCount += vertices.size();
+
+    PushToGPUDynamicVertexBuffer(&gDynamicVertexBuffer);
+}
+
+// TODO: remplace this function for a generic polygon function
+// not just cubes
+i32 ViewAddPolyPlane()
+{
+    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
+    Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
+    Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
+
+    ASSERT(polyPlaneStorage->polygonsCount < ARRAY_LENGTH(polyPlaneStorage->polygons));
+    i32 index = polyPlaneStorage->polygonsCount++;
+
+    Poly2D *front = frontStorage->polygons + index;
+    Poly2D *side  = sideStorage->polygons  + index;
+
+    Vec2 xDim = {FLT_MAX, -FLT_MAX}; 
+    Vec2 yDim = {FLT_MAX, -FLT_MAX}; 
+    Vec2 zDim = {FLT_MAX, -FLT_MAX};
+
+    for(i32 i = 0; i < front->verticesCount; ++i)
+    {
+        Vec2 vertice = front->vertices[i];
+        if(vertice.x <= xDim.x)
+        {
+            xDim.x = vertice.x;
+        }
+        if(vertice.x >= xDim.y)
+        {
+            xDim.y = vertice.x;
+        }
+
+        if(vertice.y <= yDim.x)
+        {
+            yDim.x = vertice.y;
+        }
+        if(vertice.y >= yDim.y)
+        {
+            yDim.y = vertice.y;
+        }
+    }
+
+    for(i32 i = 0; i < side->verticesCount; ++i)
+    {
+        Vec2 vertice = side->vertices[i];
+        if(vertice.x <= zDim.x)
+        {
+            zDim.x = vertice.x;
+        }
+        if(vertice.x >= zDim.y)
+        {
+            zDim.y = vertice.x;
+        }
+    }
+
+    PolyPlane poly;
+    poly.planes[0] = { { 1, 0, 0},  xDim.y };
+    poly.planes[1] = { {-1, 0, 0}, -xDim.x };
+    poly.planes[2] = { {0,  1, 0},  yDim.y };
+    poly.planes[3] = { {0, -1, 0}, -yDim.x };
+    poly.planes[4] = { {0, 0,  1},  zDim.y };
+    poly.planes[5] = { {0, 0, -1}, -zDim.x };
+    poly.planesCount = 6;
+    polyPlaneStorage->polygons[index] = poly;
+
+    PushPolyPlaneToVertexBuffer(&poly);
+
+    return index;
+}
+
 i32 ViewAddQuad(View *view, Vec2 start, Vec2 end)
 {
     Poly2DStorage *poly2dStorage = ViewGetPoly2DStorage(view);
@@ -405,7 +629,7 @@ void RenderPoly2D(View *view, Poly2D *poly, u32 color)
         WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
         WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
 
-        DrawLine(sax,  say, 0, sbx,  sby, 0, color);
+        DrawLine(sax,  say, -2, sbx,  sby, -2, color);
     }
 
     Vec2 a = poly->vertices[poly->verticesCount - 1];
@@ -413,5 +637,5 @@ void RenderPoly2D(View *view, Poly2D *poly, u32 color)
     f32 sax, say, sbx, sby;
     WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
     WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
-    DrawLine(sax,  say, 0, sbx,  sby, 0, color);
+    DrawLine(sax,  say, -2, sbx,  sby, -2, color);
 }

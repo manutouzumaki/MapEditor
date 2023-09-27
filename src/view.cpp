@@ -77,6 +77,8 @@ struct SharedMemory
 {
     Poly2DStorage poly2dStorage[3];
     PolyPlaneStorage polyPlaneStorage;
+
+    i32 selectedPolygon = -1;
 };
 
 static SharedMemory gSharedMemory;

@@ -26,6 +26,7 @@ static u32 gResizeHeight;
 static f32 gCurrentWindowWidth = WINDOW_WIDTH;
 static f32 gCurrentWindowHeight = WINDOW_HEIGHT;
 static f32 gFixWidth = 200.0f;
+static f32 gUnitSize = 64.0f;
 
 // global variables for use during rendering
 static Shader gColShader;

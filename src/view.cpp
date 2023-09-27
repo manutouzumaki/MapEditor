@@ -4,6 +4,10 @@ typedef void (*SetupFNP) (View *view);
 typedef void (*ProcessFNP) (View *view);
 typedef void (*RenderFNP) (View *view);
 
+typedef void (*AddOtherViewsPolysFNP) (Vec2 start, Vec2 end);
+typedef void (*UpdateOtherViewsPolysFNP) (RectMinMax rect, i32 quadIndex);
+
+
 enum ProjType
 {
     PROJ_TYPE_PERSP,
@@ -39,6 +43,14 @@ struct ViewOrthoState
     bool leftButtonDown;
     bool middleButtonDown;
     bool rightButtonDown;
+
+    Vec2 startP;
+    Vec2 endP;
+    i32 quadIndex;
+    RectMinMax rect;
+    AddOtherViewsPolysFNP addOtherViewsPolys;
+    UpdateOtherViewsPolysFNP updateOtherViewsPolys;
+
 };
 
 struct View
@@ -197,7 +209,7 @@ void ScreenToWorld(f32 sx, f32 sy, f32 &wx, f32 &wy, f32 offsetX, f32 offsetY, f
 
 i32 MouseRelToClientX()
 {
-    i32 mouseRelToClientX = MouseX() - 200; // TODO: use a global for this value
+    i32 mouseRelToClientX = MouseX() - gFixWidth; // TODO: use a global for this value
     return mouseRelToClientX;
 }
 
@@ -237,10 +249,10 @@ void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
 {
     for(f32 y = -100.0f; y < 100.0f; ++y)
     {
-        f32 ax = -100.0f * 64;
-        f32 ay = y * 64;
-        f32 bx = 100.0f * 64;
-        f32 by = y * 64;
+        f32 ax = -100.0f * gUnitSize;
+        f32 ay = y * gUnitSize;
+        f32 bx = 100.0f * gUnitSize;
+        f32 by = y * gUnitSize;
         
         f32 sax, say, sbx, sby;
 
@@ -253,10 +265,10 @@ void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
     for(f32 x = -100.0f; x < 100.0f; ++x)
     {
 
-        f32 ax = x * 64;
-        f32 ay = -100.0f * 64.0f;
-        f32 bx = x * 64;
-        f32 by = 64.f*100.0f;
+        f32 ax = x * gUnitSize;
+        f32 ay = -100.0f * gUnitSize;
+        f32 bx = x * gUnitSize;
+        f32 by = gUnitSize*100.0f;
         
         f32 sax, say, sbx, sby;
 
@@ -267,79 +279,22 @@ void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
     }
 
     f32 ax = 0;
-    f32 ay = -100.0f * 64.0f;
+    f32 ay = -100.0f * gUnitSize;
     f32 bx = 0;
-    f32 by = 64.f*100.0f;
+    f32 by = gUnitSize*100.0f;
     f32 sax, say, sbx, sby;
     WorldToScreen(ax, ay, sax, say, offsetX, offsetY, zoom); 
     WorldToScreen(bx, by, sbx, sby, offsetX, offsetY, zoom); 
     DrawLine(sax,  say, 0, sbx,  sby, -1, 0xFFAAFFAA);
 
-    ax = -100.0f * 64.0f;
+    ax = -100.0f * gUnitSize;
     ay = 0;
-    bx =  100.0f * 64.0f;
+    bx =  100.0f * gUnitSize;
     by = 0;
     WorldToScreen(ax, ay, sax, say, offsetX, offsetY, zoom); 
     WorldToScreen(bx, by, sbx, sby, offsetX, offsetY, zoom); 
     DrawLine(sax,  say, 0, sbx,  sby, -1, 0xFFFFAAAA);
 
-}
-
-void ViewOrthoBaseSetup(View *view)
-{
-    ViewOrthoState *state = &view->orthoState;
-    state->wheelOffset = 5.0f;
-    state->zoom = Remap(0.0f, 50.0f, 0.05f, 10.0f, state->wheelOffset);
-}
-
-void ViewOrthoBaseProcess(View *view)
-{
-    ViewOrthoState *state = &view->orthoState;
-
-    i32 mouseRelX = MouseRelX(view);
-    i32 mouseRelY = MouseRelY(view);
-
-    if(MouseIsHot(view))
-    {
-        if(MouseJustDown(MOUSE_BUTTON_MIDDLE))
-        {
-            state->middleButtonDown = true;
-            state->lastClickX = mouseRelX;
-            state->lastClickY = mouseRelY;
-        }
-
-        f32 mouseWorldPreZoomX, mouseWorldPreZoomY;
-        ScreenToWorld(mouseRelX, mouseRelY, mouseWorldPreZoomX, mouseWorldPreZoomY,
-                      state->offsetX, state->offsetY, state->zoom);
-
-        i32 mouseWheelDelta = MouseWheelDelta();
-        if(mouseWheelDelta != 0)
-        {
-            state->wheelOffset += (f32)mouseWheelDelta;
-            state->wheelOffset = Clamp(state->wheelOffset, 0.0f, 50.0f);
-            state->zoom = Remap(0.0f, 50.0f, 0.2f, 10.0f, state->wheelOffset);
-        }
-
-        f32 mouseWorldPostZoomX, mouseWorldPostZoomY;
-        ScreenToWorld(mouseRelX, mouseRelY, mouseWorldPostZoomX, mouseWorldPostZoomY,
-                      state->offsetX, state->offsetY, state->zoom);
-
-        state->offsetX += (mouseWorldPreZoomX - mouseWorldPostZoomX);
-        state->offsetY += (mouseWorldPreZoomY - mouseWorldPostZoomY);
-    }
-    
-    if(MouseJustUp(MOUSE_BUTTON_MIDDLE) && state->middleButtonDown)
-    {
-        state->middleButtonDown = false;
-    }
-
-    if(state->middleButtonDown)
-    {
-        state->offsetX += (state->lastClickX - mouseRelX) / state->zoom;
-        state->offsetY += (state->lastClickY - mouseRelY) / state->zoom;
-        state->lastClickX = mouseRelX;
-        state->lastClickY = mouseRelY;
-    }
 }
 
 void ViewOrthoBaseRender(View *view)
@@ -638,4 +593,118 @@ void RenderPoly2D(View *view, Poly2D *poly, u32 color)
     WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
     WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
     DrawLine(sax,  say, -2, sbx,  sby, -2, color);
+}
+
+
+void ViewOrthoBaseSetup(View *view)
+{
+    ViewOrthoState *state = &view->orthoState;
+    state->wheelOffset = 5.0f;
+    state->zoom = Remap(0.0f, 50.0f, 0.05f, 10.0f, state->wheelOffset);
+}
+
+void ViewOrthoBasePannelAndZoom(View *view)
+{
+    ViewOrthoState *state = &view->orthoState;
+
+    i32 mouseRelX = MouseRelX(view);
+    i32 mouseRelY = MouseRelY(view);
+
+    if(MouseIsHot(view))
+    {
+        if(MouseJustDown(MOUSE_BUTTON_MIDDLE))
+        {
+            state->middleButtonDown = true;
+            state->lastClickX = mouseRelX;
+            state->lastClickY = mouseRelY;
+        }
+
+        f32 mouseWorldPreZoomX, mouseWorldPreZoomY;
+        ScreenToWorld(mouseRelX, mouseRelY, mouseWorldPreZoomX, mouseWorldPreZoomY,
+                      state->offsetX, state->offsetY, state->zoom);
+
+        i32 mouseWheelDelta = MouseWheelDelta();
+        if(mouseWheelDelta != 0)
+        {
+            state->wheelOffset += (f32)mouseWheelDelta;
+            state->wheelOffset = Clamp(state->wheelOffset, 0.0f, 50.0f);
+            state->zoom = Remap(0.0f, 50.0f, 0.2f, 10.0f, state->wheelOffset);
+        }
+
+        f32 mouseWorldPostZoomX, mouseWorldPostZoomY;
+        ScreenToWorld(mouseRelX, mouseRelY, mouseWorldPostZoomX, mouseWorldPostZoomY,
+                      state->offsetX, state->offsetY, state->zoom);
+
+        state->offsetX += (mouseWorldPreZoomX - mouseWorldPostZoomX);
+        state->offsetY += (mouseWorldPreZoomY - mouseWorldPostZoomY);
+    }
+    
+    if(MouseJustUp(MOUSE_BUTTON_MIDDLE) && state->middleButtonDown)
+    {
+        state->middleButtonDown = false;
+    }
+
+    if(state->middleButtonDown)
+    {
+        state->offsetX += (state->lastClickX - mouseRelX) / state->zoom;
+        state->offsetY += (state->lastClickY - mouseRelY) / state->zoom;
+        state->lastClickX = mouseRelX;
+        state->lastClickY = mouseRelY;
+    }
+}
+
+void ViewOrthoBaseDraw(View *view)
+{
+    ViewOrthoState *state = &view->orthoState;
+    i32 mouseRelX = MouseRelX(view);
+    i32 mouseRelY = MouseRelY(view);
+
+    if(MouseIsHot(view))
+    {
+        f32 mouseWorldX, mouseWorldY;
+        ScreenToWorld(mouseRelX, mouseRelY, mouseWorldX, mouseWorldY,
+                      state->offsetX, state->offsetY, state->zoom);
+
+        if(MouseJustDown(MOUSE_BUTTON_LEFT))
+        {
+            state->leftButtonDown = true;
+            f32 startX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
+            f32 startY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
+            state->startP = {startX, startY};
+            state->quadIndex = ViewAddQuad(view, state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize});
+            state->addOtherViewsPolys(state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize});
+        }
+        
+        if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown)
+        {
+            state->leftButtonDown = false;
+            f32 endX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
+            f32 endY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
+            state->endP = {endX, endY};
+
+            state->rect.min.x = Min(state->startP.x, state->endP.x);
+            state->rect.min.y = Min(state->startP.y, state->endP.y);
+            state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
+            state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
+            ViewUpdateQuad(view, state->rect.min, state->rect.max, state->quadIndex);
+            state->updateOtherViewsPolys(state->rect, state->quadIndex);
+            ViewAddPolyPlane();
+        }
+        
+        if(state->leftButtonDown)
+        {
+            //  update the end position every frame to get real time
+            //  response to moving the mouse
+            f32 endX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
+            f32 endY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
+            state->endP = {endX, endY};
+
+            state->rect.min.x = Min(state->startP.x, state->endP.x);
+            state->rect.min.y = Min(state->startP.y, state->endP.y);
+            state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
+            state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
+            ViewUpdateQuad(view, state->rect.min, state->rect.max, state->quadIndex);
+            state->updateOtherViewsPolys(state->rect, state->quadIndex);
+        }
+    }
 }

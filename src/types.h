@@ -106,6 +106,12 @@ struct PolyPlane
     i32 planesCount;
 };
 
+struct Poly3D
+{
+    Vertex vertices[255];
+    i32 verticesCount;
+};
+
 struct Poly2D
 {
     Vec2 vertices[255];

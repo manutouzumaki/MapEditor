@@ -1,5 +1,6 @@
-
 #include <stdio.h>
+#include <stdlib.h>
+#include <memory.h>
 
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -12,6 +13,7 @@
 #include <d3dcompiler.h>
 
 #include "defines.h"
+#include "darray.h"
 #include "math.h"
 #include "types.h"
 
@@ -52,6 +54,7 @@ static Vertex gQuad[] = {
     {{ 0.5f,  0.5f, 0}, {0.8, 0.8, 0.8, 1}, {1, 0}}
 };
 
+#include "darray.cpp"
 #include "input.cpp"
 #include "win32.cpp"
 #include "line.cpp"
@@ -334,7 +337,7 @@ int main()
             static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Hello, world!", 0, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoCollapse); // Create a window called "Hello, world!" and append into it.
+            ImGui::Begin("Hello, MapEditor!", 0, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoCollapse); // Create a window called "Hello, world!" and append into it.
 
             ImGui::SetWindowSize(ImVec2(fixWidth, gCurrentWindowHeight));
             ImGui::SetWindowPos(ImVec2(0, 0));

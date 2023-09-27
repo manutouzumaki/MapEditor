@@ -362,6 +362,7 @@ Poly2DStorage *ViewGetPoly2DStorage(View *view)
     return poly2dStorage;
 }
 
+
 static bool GetIntersection(Vec3 n1, Vec3 n2, Vec3 n3, f32 d1, f32 d2, f32 d3, Vertex *vertex)
 {
     f32 denom = Vec3Dot(n1, Vec3Cross(n2, n3));
@@ -378,13 +379,6 @@ static bool GetIntersection(Vec3 n1, Vec3 n2, Vec3 n3, f32 d1, f32 d2, f32 d3, V
     return true;
 }
 
-#include <vector>
-
-struct PolygonData
-{
-    std::vector <Vertex> vertices;
-};
-
 static Plane GetPlaneFromThreePoints(Vec3 a, Vec3 b, Vec3 c)
 {
     Plane plane;
@@ -395,21 +389,22 @@ static Plane GetPlaneFromThreePoints(Vec3 a, Vec3 b, Vec3 c)
     return {n, d};
 }
 
-static Vec3 GetCenterOfPolygon(PolygonData *polygon)
+static Vec3 GetCenterOfPolygon(Poly3D *polygon)
 {
     Vec3 center = {};
-    for(i32 i = 0; i < polygon->vertices.size(); ++i)
+    for(i32 i = 0; i < polygon->verticesCount; ++i)
     {
         center = center + polygon->vertices[i].position;
     }
-    center = center / polygon->vertices.size();
+    center = center / polygon->verticesCount;
     return center;
 }
 
+
 void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
 {
-    std::vector<PolygonData> polygons;
-    polygons.resize(poly->planesCount);
+    Poly3D *polygons = (Poly3D *)malloc(poly->planesCount * sizeof(Poly3D));
+    memset(polygons, 0, poly->planesCount * sizeof(Poly3D));
     for(i32 i = 0; i < poly->planesCount - 2; ++i) {
     for(i32 j = i; j < poly->planesCount - 1; ++j) {
     for(i32 k = j; k < poly->planesCount - 0; ++k) {
@@ -421,14 +416,14 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
             Plane c = poly->planes[k];
 
             Vertex vertex = {};
-            if(GetIntersection(a.n, b.n, c.n, -a.d, -b.d, -c.d, &vertex))
+            if(GetIntersection(a.n, b.n, c.n, a.d, b.d, c.d, &vertex))
             {
                 bool illegal = false;
                 for(i32 m = 0; m < poly->planesCount; ++m)
                 {
                     Plane plane = poly->planes[m];
                     f32 dot = Vec3Dot(plane.n, vertex.position);
-                    f32 d = -plane.d;
+                    f32 d = plane.d;
                     f32 test = dot + d;
                     if(test > EPSILON)
                     {
@@ -440,9 +435,9 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
                     // TODO: add the vertex
                     Mat4 scaleMat = Mat4Scale(1.0f/128.0f, 1.0f/128.0f, 1.0f/128.0f);
                     vertex.position = Mat4TransformPoint(scaleMat, vertex.position);
-                    polygons[i].vertices.push_back(vertex);
-                    polygons[j].vertices.push_back(vertex);
-                    polygons[k].vertices.push_back(vertex);
+                    polygons[i].vertices[polygons[i].verticesCount++] = vertex;
+                    polygons[j].vertices[polygons[j].verticesCount++] = vertex;
+                    polygons[k].vertices[polygons[k].verticesCount++] = vertex;
                 }
             }
         }
@@ -453,14 +448,14 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
     for(i32 p = 0; p < poly->planesCount; ++p)
     {
         Plane polygonPlane = poly->planes[p]; 
-        PolygonData *polygon = polygons.data() + p;
+        Poly3D *polygon = polygons + p;
 
-        ASSERT(polygon->vertices.size() >= 3);
+        ASSERT(polygon->verticesCount >= 3);
 
         Vec3 center = GetCenterOfPolygon(polygon);
 
         
-        for(i32 n = 0; n <= polygon->vertices.size() - 3; ++n)
+        for(i32 n = 0; n <= polygon->verticesCount - 3; ++n)
         {
             Vec3 a = Vec3Normalized(polygon->vertices[n].position - center);
             Plane p = GetPlaneFromThreePoints(polygon->vertices[n].position,
@@ -469,7 +464,7 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
             f32 smallestAngle = -1;
             i32 smallest = -1;
 
-            for(i32 m = n + 1; m <= polygon->vertices.size() - 1; ++m)
+            for(i32 m = n + 1; m <= polygon->verticesCount - 1; ++m)
             {
                 Vertex vertex = polygon->vertices[m];
                 if((Vec3Dot(p.n, vertex.position) + p.d) > 0.0f)
@@ -493,28 +488,31 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
         } 
     }
 
-    std::vector<Vertex> vertices;
+    Vertex *vertices = 0;
     
-    for(i32 i = 0; i < polygons.size(); ++i)
+    for(i32 i = 0; i < poly->planesCount; ++i)
     {
-        PolygonData *poly = &polygons[i];
-        for(i32 j = 0; j < poly->vertices.size() - 2; ++j)
+        Poly3D *polyD = &polygons[i];
+        for(i32 j = 0; j < polyD->verticesCount - 2; ++j)
         {
-            Vertex a = poly->vertices[0];
-            Vertex b = poly->vertices[j + 1];
-            Vertex c = poly->vertices[j + 2];
-            vertices.push_back(a);
-            vertices.push_back(b);
-            vertices.push_back(c);
+            Vertex a = polyD->vertices[0];
+            Vertex b = polyD->vertices[j + 1];
+            Vertex c = polyD->vertices[j + 2];
+            DarrayPush(vertices, a, Vertex);
+            DarrayPush(vertices, b, Vertex);
+            DarrayPush(vertices, c, Vertex);
         }
     }
 
     ASSERT((gDynamicVertexBuffer.used + sizeof(Vertex)) < gDynamicVertexBuffer.size);
-    memcpy((char *)gDynamicVertexBuffer.CPUBuffer + gDynamicVertexBuffer.used, vertices.data(), vertices.size() * sizeof(Vertex));
-    gDynamicVertexBuffer.used += vertices.size() * sizeof(Vertex);
-    gDynamicVertexBuffer.verticesCount += vertices.size();
+    memcpy((char *)gDynamicVertexBuffer.CPUBuffer + gDynamicVertexBuffer.used, vertices, DarraySize(vertices) * sizeof(Vertex));
+    gDynamicVertexBuffer.used += DarraySize(vertices) * sizeof(Vertex);
+    gDynamicVertexBuffer.verticesCount += DarraySize(vertices);
 
     PushToGPUDynamicVertexBuffer(&gDynamicVertexBuffer);
+
+    DarrayDestroy(vertices);
+    free(polygons);
 }
 
 // TODO: remplace this function for a generic polygon function
@@ -571,12 +569,12 @@ i32 ViewAddPolyPlane()
     }
 
     PolyPlane poly;
-    poly.planes[0] = { { 1, 0, 0},  xDim.y };
-    poly.planes[1] = { {-1, 0, 0}, -xDim.x };
-    poly.planes[2] = { {0,  1, 0},  yDim.y };
-    poly.planes[3] = { {0, -1, 0}, -yDim.x };
-    poly.planes[4] = { {0, 0,  1},  zDim.y };
-    poly.planes[5] = { {0, 0, -1}, -zDim.x };
+    poly.planes[0] = { { 1,  0,  0}, -xDim.y };
+    poly.planes[1] = { {-1,  0,  0},  xDim.x };
+    poly.planes[2] = { { 0,  1,  0}, -yDim.y };
+    poly.planes[3] = { { 0, -1,  0},  yDim.x };
+    poly.planes[4] = { { 0,  0,  1}, -zDim.y };
+    poly.planes[5] = { { 0,  0, -1},  zDim.x };
     poly.planesCount = 6;
     polyPlaneStorage->polygons[index] = poly;
 

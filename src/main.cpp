@@ -87,11 +87,8 @@ int main()
     HINSTANCE instace = GetModuleHandle(0);
     HWND window = InitWindow(instace);
     InitD3D11(window);
-
     LineRendererInitialize(200);
- 
     InitImGui(window);
-
 
     // Load Shader and Create Input Layout
     gColShader = LoadShader("../src/shaders/colVert.hlsl", "../src/shaders/colFrag.hlsl");
@@ -125,23 +122,6 @@ int main()
     
     ViewManager vm; // NOT initialize to zero (default values are used)
     ViewManagerSetup(&vm, clientRect);
-
-    // Create Sampler State
-    ID3D11SamplerState *samplerState;
-    D3D11_SAMPLER_DESC colorMapDesc = {};
-    colorMapDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP; //D3D11_TEXTURE_ADDRESS_WRAP;
-    colorMapDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP; //D3D11_TEXTURE_ADDRESS_WRAP;
-    colorMapDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP; //D3D11_TEXTURE_ADDRESS_WRAP;
-    colorMapDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-    colorMapDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT; //D3D11_FILTER_MIN_MAG_MIP_LINEAR | D3D11_FILTER_MIN_MAG_MIP_POINT
-    colorMapDesc.MaxLOD = D3D11_FLOAT32_MAX;
-    if(FAILED(device->CreateSamplerState(&colorMapDesc, &samplerState)))
-    {
-        printf("Error: Failed Creating sampler state\n");
-        ASSERT(!"INVALID_CODE_PATH");
-    }
-    deviceContext->PSSetSamplers(0, 1, &samplerState);
-
 
     // create the const buffer data to be pass to the gpu
     Vec3 up  = {0, 1,  0};
@@ -188,7 +168,6 @@ int main()
     ViewManagerShutDown(&vm);
  
     if(layout) layout->Release();
-    if(samplerState) samplerState->Release();
 
     LineRendererShutdown();
     ShutdownD3D11();

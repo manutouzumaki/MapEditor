@@ -13,6 +13,8 @@ static ID3D11DepthStencilState* depthStencilOff;
 static ID3D11BlendState* alphaBlendEnable;
 static ID3D11BlendState* alphaBlendDisable;
 
+static ID3D11SamplerState *gSamplerState;
+
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -263,10 +265,25 @@ static void InitD3D11(HWND window)
     wireFrameRasterizerDesc.DepthClipEnable = true;
     device->CreateRasterizerState(&wireFrameRasterizerDesc, &wireFrameRasterizer);
 
+    // Create Sampler State
+    D3D11_SAMPLER_DESC colorMapDesc = {};
+    colorMapDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP; //D3D11_TEXTURE_ADDRESS_WRAP;
+    colorMapDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP; //D3D11_TEXTURE_ADDRESS_WRAP;
+    colorMapDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP; //D3D11_TEXTURE_ADDRESS_WRAP;
+    colorMapDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    colorMapDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT; //D3D11_FILTER_MIN_MAG_MIP_LINEAR | D3D11_FILTER_MIN_MAG_MIP_POINT
+    colorMapDesc.MaxLOD = D3D11_FLOAT32_MAX;
+    if(FAILED(device->CreateSamplerState(&colorMapDesc, &gSamplerState)))
+    {
+        printf("Error: Failed Creating sampler state\n");
+        ASSERT(!"INVALID_CODE_PATH");
+    }
+
     deviceContext->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
     deviceContext->OMSetDepthStencilState(depthStencilOn, 1);
     deviceContext->OMSetBlendState(alphaBlendEnable, 0, 0xffffffff);
     deviceContext->RSSetState(fillRasterizerCullBack);
+    deviceContext->PSSetSamplers(0, 1, &gSamplerState);
 }
 
 static void ShutdownD3D11()
@@ -285,6 +302,7 @@ static void ShutdownD3D11()
     if(depthStencilOff) depthStencilOff->Release();
     if(alphaBlendEnable) alphaBlendEnable->Release();
     if(alphaBlendDisable) alphaBlendDisable->Release();
+    if(gSamplerState) gSamplerState->Release();
 }
 
 static void FlushEvents(HWND window)

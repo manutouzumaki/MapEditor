@@ -25,11 +25,15 @@ static u32 gResizeWidth;
 static u32 gResizeHeight;
 static f32 gCurrentWindowWidth = WINDOW_WIDTH;
 static f32 gCurrentWindowHeight = WINDOW_HEIGHT;
+
+// TODO: this cant be change by the user
 static f32 gFixWidth = 200.0f;
 static f32 gUnitSize = 64.0f;
+static f32 gGridSize = 200.0f;
 
 // global variables for use during rendering
 static Shader gColShader;
+static Shader gCol2DShader;
 static Shader gTexShader;
 static ConstBuffer gConstBuffer;
 static VertexBuffer gVertexBuffer;
@@ -45,12 +49,41 @@ static Vertex gQuad[] = {
     {{ 0.5f,  0.5f, 0}, {0, 0, 1}, {0.8, 0.8, 0.8, 1}, {1, 0}}
 };
 
+// global to handle editor state
+enum EditorMode
+{
+    EDITOR_MODE_SELECT_POLY,
+    EDITOR_MODE_ADD_POLY,
+    EDITOR_MODE_MODIFY_POLY,
+    EDITOR_MODE_MOVE_3D_CAMERA,
+
+    EDITOR_MODE_COUNT
+};
+
+enum ControlPoint
+{
+    CONTROL_POINT_BOTL,
+    CONTROL_POINT_BOTR,
+    CONTROL_POINT_TOPL,
+    CONTROL_POINT_TOPR,
+    CONTROL_POINT_MIDL,
+    CONTROL_POINT_MIDR,
+    CONTROL_POINT_MIDT,
+    CONTROL_POINT_MIDB,
+
+    CONTROL_POINT_COUNT
+};
+
+// TODO: see what to do with this ones
+static EditorMode gCurrentEditorMode;
+static SharedMemory gSharedMemory;
 
 #include "darray.cpp"
 #include "input.cpp"
 #include "win32.cpp"
 #include "line.cpp"
 #include "view.cpp"
+#include "editorModes.cpp"
 
 #include "mainView.cpp"
 #include "frontView.cpp"
@@ -93,6 +126,7 @@ int main()
 
     // Load Shader and Create Input Layout
     gColShader = LoadShader("../src/shaders/colVert.hlsl", "../src/shaders/colFrag.hlsl");
+    gCol2DShader = LoadShader("../src/shaders/col2dVert.hlsl", "../src/shaders/col2dFrag.hlsl");
     gTexShader = LoadShader("../src/shaders/texVert.hlsl", "../src/shaders/texFrag.hlsl");
     
     ID3D11InputLayout *layout = 0;

@@ -97,6 +97,11 @@ struct RectMinMax
     };
 };
 
+struct RectVert
+{
+    Vec2 a, b, c, d;
+};
+
 struct Plane
 {
     Vec3 n;
@@ -119,7 +124,28 @@ struct Poly2D
 {
     Vec2 vertices[255];
     i32 verticesCount;
+    u32 color;
 };
 
+// TODO: use a link list base storage system
+struct Poly2DStorage
+{
+    Poly2D polygons[255];
+    i32 polygonsCount;
+};
+
+struct PolyPlaneStorage
+{
+    PolyPlane polygons[255];
+    i32 polygonsCount;
+};
+
+struct SharedMemory
+{
+    Poly2DStorage poly2dStorage[3];
+    PolyPlaneStorage polyPlaneStorage;
+
+    i32 selectedPolygon = -1;
+};
 
 #endif

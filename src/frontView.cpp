@@ -1,4 +1,4 @@
-static void AddSideAndTopViewsPolys(Vec2 startP, Vec2 endP)
+static void AddSideAndTopViewsPolys(Vec2 startP, Vec2 endP, u32 color)
 {
     Poly2D poly;
 
@@ -8,6 +8,7 @@ static void AddSideAndTopViewsPolys(Vec2 startP, Vec2 endP)
     poly.vertices[2] = {gUnitSize, startP.y};
     poly.vertices[3] = {0, startP.y};
     poly.verticesCount = 4;
+    poly.color = color;
     ASSERT(sideStorage->polygonsCount < ARRAY_LENGTH(sideStorage->polygons));
     sideStorage->polygons[sideStorage->polygonsCount++] = poly;
     
@@ -17,11 +18,12 @@ static void AddSideAndTopViewsPolys(Vec2 startP, Vec2 endP)
     poly.vertices[2] = {endP.x, 0};
     poly.vertices[3] = {startP.x, 0};
     poly.verticesCount = 4;
+    poly.color = color;
     ASSERT(topStorage->polygonsCount < ARRAY_LENGTH(topStorage->polygons));
     topStorage->polygons[topStorage->polygonsCount++] = poly;
 }
 
-static void UpdateSideAndTopViewsPolys(RectMinMax rect, i32 quadIndex)
+static void UpdateSideAndTopViewsPolys(RectMinMax rect, i32 quadIndex, u32 color)
 {
     Poly2D poly;
 
@@ -31,6 +33,7 @@ static void UpdateSideAndTopViewsPolys(RectMinMax rect, i32 quadIndex)
     poly.vertices[2] = {gUnitSize, rect.min.y};
     poly.vertices[3] = {0, rect.min.y};
     poly.verticesCount = 4;
+    poly.color = color;
     sideStorage->polygons[quadIndex] = poly;
     
     Poly2DStorage *topStorage = gSharedMemory.poly2dStorage + VIEW_TOP;
@@ -39,6 +42,7 @@ static void UpdateSideAndTopViewsPolys(RectMinMax rect, i32 quadIndex)
     poly.vertices[2] = {rect.max.x, 0};
     poly.vertices[3] = {rect.min.x, 0};
     poly.verticesCount = 4;
+    poly.color = color;
     topStorage->polygons[quadIndex] = poly;
 }
 
@@ -54,7 +58,9 @@ void SetupFrontView(View *view)
 void ProcessFrontView(View *view)
 {
     ViewOrthoBasePannelAndZoom(view);
-    ViewOrthoBaseDraw(view);
+
+    EditorModeAddPoly(view);
+    EditorModeModifyPoly(view);
 }
 
 void RenderFrontView(View *view)
@@ -66,7 +72,7 @@ void RenderFrontView(View *view)
     for(i32 i = 0; i  < poly2dStorage->polygonsCount; ++i)
     {
         Poly2D *poly = poly2dStorage->polygons + i;
-        RenderPoly2D(view ,poly, 0xFFFFFFAA);
+        RenderPoly2D(view ,poly, poly->color);
     }
     LineRendererDraw();
 }

@@ -1,4 +1,4 @@
-static void AddFrontAndSideViewsPolys(Vec2 startP, Vec2 endP)
+static void AddFrontAndSideViewsPolys(Vec2 startP, Vec2 endP, u32 color)
 {
     Poly2D poly;
     Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
@@ -7,6 +7,7 @@ static void AddFrontAndSideViewsPolys(Vec2 startP, Vec2 endP)
     poly.vertices[2] = {endP.x, 0};
     poly.vertices[3] = {startP.x, 0};
     poly.verticesCount = 4;
+    poly.color = color;
     ASSERT(frontStorage->polygonsCount < ARRAY_LENGTH(frontStorage->polygons));
     frontStorage->polygons[frontStorage->polygonsCount++] = poly;
 
@@ -16,11 +17,12 @@ static void AddFrontAndSideViewsPolys(Vec2 startP, Vec2 endP)
     poly.vertices[2] = {endP.y, 0};
     poly.vertices[3] = {startP.y, 0};
     poly.verticesCount = 4;
+    poly.color = color;
     ASSERT(sideStorage->polygonsCount < ARRAY_LENGTH(sideStorage->polygons));
     sideStorage->polygons[sideStorage->polygonsCount++] = poly;
 }
 
-static void UpdateFrontAndSideViewsPolys(RectMinMax rect, i32 quadIndex)
+static void UpdateFrontAndSideViewsPolys(RectMinMax rect, i32 quadIndex, u32 color)
 {
     Poly2D poly;
     Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT; 
@@ -29,6 +31,7 @@ static void UpdateFrontAndSideViewsPolys(RectMinMax rect, i32 quadIndex)
     poly.vertices[2] = {rect.max.x, 0};
     poly.vertices[3] = {rect.min.x, 0};
     poly.verticesCount = 4;
+    poly.color = color;
     frontStorage->polygons[quadIndex] = poly;
 
     Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
@@ -37,6 +40,7 @@ static void UpdateFrontAndSideViewsPolys(RectMinMax rect, i32 quadIndex)
     poly.vertices[2] = {rect.max.y, 0};
     poly.vertices[3] = {rect.min.y, 0};
     poly.verticesCount = 4;
+    poly.color = color;
     sideStorage->polygons[quadIndex] = poly;
 }
 
@@ -52,7 +56,9 @@ void SetupTopView(View *view)
 void ProcessTopView(View *view)
 {
     ViewOrthoBasePannelAndZoom(view);
-    ViewOrthoBaseDraw(view);
+
+    EditorModeAddPoly(view);
+    EditorModeModifyPoly(view);
 }
 
 void RenderTopView(View *view)
@@ -64,7 +70,7 @@ void RenderTopView(View *view)
     for(i32 i = 0; i  < poly2dStorage->polygonsCount; ++i)
     {
         Poly2D *poly = poly2dStorage->polygons + i;
-        RenderPoly2D(view ,poly, 0xFFFFFFAA);
+        RenderPoly2D(view ,poly, poly->color);
     }
     LineRendererDraw();
 }

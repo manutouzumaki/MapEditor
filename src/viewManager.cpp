@@ -203,8 +203,8 @@ void ViewManagerRenderViews(ViewManager *vm, CBuffer *cbuffer, Rect clientRect)
     if(vm->modifyViewsX)
     {
         // draw the mouse position 
-        deviceContext->VSSetShader(gColShader.vertex, 0, 0);
-        deviceContext->PSSetShader(gColShader.fragment, 0, 0);
+        deviceContext->VSSetShader(gCol2DShader.vertex, 0, 0);
+        deviceContext->PSSetShader(gCol2DShader.fragment, 0, 0);
 
         // Horizontal line
         cbuffer->world = Mat4Translate(clientRect.x + clientRect.w * vm->newDivisorX,
@@ -215,8 +215,8 @@ void ViewManagerRenderViews(ViewManager *vm, CBuffer *cbuffer, Rect clientRect)
     if(vm->modifyViewsY)
     {
         // draw the mouse position 
-        deviceContext->VSSetShader(gColShader.vertex, 0, 0);
-        deviceContext->PSSetShader(gColShader.fragment, 0, 0);
+        deviceContext->VSSetShader(gCol2DShader.vertex, 0, 0);
+        deviceContext->PSSetShader(gCol2DShader.fragment, 0, 0);
         // Vertical line
         cbuffer->world = Mat4Translate(clientRect.x + clientRect.w*0.5f,
                                       clientRect.y + clientRect.h * (1.0f-vm->newDivisorY), 0.0f) * Mat4Scale(clientRect.w, 3, 1);

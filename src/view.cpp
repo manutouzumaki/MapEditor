@@ -4,8 +4,8 @@ typedef void (*SetupFNP) (View *view);
 typedef void (*ProcessFNP) (View *view);
 typedef void (*RenderFNP) (View *view);
 
-typedef void (*AddOtherViewsPolysFNP) (Vec2 start, Vec2 end);
-typedef void (*UpdateOtherViewsPolysFNP) (RectMinMax rect, i32 quadIndex);
+typedef void (*AddOtherViewsPolysFNP) (Vec2 start, Vec2 end, u32 color);
+typedef void (*UpdateOtherViewsPolysFNP) (RectMinMax rect, i32 quadIndex, u32 color);
 
 
 enum ProjType
@@ -83,30 +83,6 @@ struct View
     ProcessFNP process;
     RenderFNP render;
 };
-
-
-// TODO: use a link list base storage system
-struct Poly2DStorage
-{
-    Poly2D polygons[255];
-    i32 polygonsCount;
-};
-
-struct PolyPlaneStorage
-{
-    PolyPlane polygons[255];
-    i32 polygonsCount;
-};
-
-struct SharedMemory
-{
-    Poly2DStorage poly2dStorage[3];
-    PolyPlaneStorage polyPlaneStorage;
-
-    i32 selectedPolygon = -1;
-};
-
-static SharedMemory gSharedMemory;
 
 View ViewCreate(f32 x, f32 y, f32 w, f32 h, ProjType projType,
                 SetupFNP setup,
@@ -260,11 +236,11 @@ bool MouseIsHot(View *view)
 
 void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
 {
-    for(f32 y = -100.0f; y < 100.0f; ++y)
+    for(f32 y = -gGridSize; y < gGridSize; ++y)
     {
-        f32 ax = -100.0f * gUnitSize;
+        f32 ax = -gGridSize * gUnitSize;
         f32 ay = y * gUnitSize;
-        f32 bx = 100.0f * gUnitSize;
+        f32 bx = gGridSize * gUnitSize;
         f32 by = y * gUnitSize;
         
         f32 sax, say, sbx, sby;
@@ -275,13 +251,13 @@ void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
         DrawLine(sax,  say, 0, sbx,  sby, 0, 0xFF333333);
     }
 
-    for(f32 x = -100.0f; x < 100.0f; ++x)
+    for(f32 x = -gGridSize; x < gGridSize; ++x)
     {
 
         f32 ax = x * gUnitSize;
-        f32 ay = -100.0f * gUnitSize;
+        f32 ay = -gGridSize * gUnitSize;
         f32 bx = x * gUnitSize;
-        f32 by = gUnitSize*100.0f;
+        f32 by = gUnitSize*gGridSize;
         
         f32 sax, say, sbx, sby;
 
@@ -292,17 +268,17 @@ void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
     }
 
     f32 ax = 0;
-    f32 ay = -100.0f * gUnitSize;
+    f32 ay = -gGridSize * gUnitSize;
     f32 bx = 0;
-    f32 by = gUnitSize*100.0f;
+    f32 by = gUnitSize*gGridSize;
     f32 sax, say, sbx, sby;
     WorldToScreen(ax, ay, sax, say, offsetX, offsetY, zoom); 
     WorldToScreen(bx, by, sbx, sby, offsetX, offsetY, zoom); 
     DrawLine(sax,  say, 0, sbx,  sby, -1, 0xFFAAFFAA);
 
-    ax = -100.0f * gUnitSize;
+    ax = -gGridSize * gUnitSize;
     ay = 0;
-    bx =  100.0f * gUnitSize;
+    bx =  gGridSize * gUnitSize;
     by = 0;
     WorldToScreen(ax, ay, sax, say, offsetX, offsetY, zoom); 
     WorldToScreen(bx, by, sbx, sby, offsetX, offsetY, zoom); 
@@ -563,6 +539,7 @@ i32 ViewAddQuad(View *view, Vec2 start, Vec2 end)
     poly.vertices[2] = {end.x, end.y};
     poly.vertices[3] = {start.x, end.y};
     poly.verticesCount = 4;
+    poly.color = 0xFFFFFFAA;
 
     ASSERT(poly2dStorage->polygonsCount < ARRAY_LENGTH(poly2dStorage->polygons));
     i32 index = poly2dStorage->polygonsCount++;
@@ -581,6 +558,7 @@ void ViewUpdateQuad(View *view, Vec2 start, Vec2 end, i32 index)
     poly.vertices[2] = {end.x, end.y};
     poly.vertices[3] = {start.x, end.y};
     poly.verticesCount = 4;
+    poly.color = 0xFFFFFFAA;
 
     poly2dStorage->polygons[index] = poly;
 }
@@ -670,61 +648,5 @@ void ViewOrthoBasePannelAndZoom(View *view)
         state->offsetY += (state->lastClickY - mouseRelY) / state->zoom;
         state->lastClickX = mouseRelX;
         state->lastClickY = mouseRelY;
-    }
-}
-
-void ViewOrthoBaseDraw(View *view)
-{
-    ViewOrthoState *state = &view->orthoState;
-    i32 mouseRelX = MouseRelX(view);
-    i32 mouseRelY = MouseRelY(view);
-
-    if(MouseIsHot(view))
-    {
-        f32 mouseWorldX, mouseWorldY;
-        ScreenToWorld(mouseRelX, mouseRelY, mouseWorldX, mouseWorldY,
-                      state->offsetX, state->offsetY, state->zoom);
-
-        if(MouseJustDown(MOUSE_BUTTON_LEFT))
-        {
-            state->leftButtonDown = true;
-            f32 startX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
-            f32 startY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
-            state->startP = {startX, startY};
-            state->quadIndex = ViewAddQuad(view, state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize});
-            state->addOtherViewsPolys(state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize});
-        }
-        
-        if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown)
-        {
-            state->leftButtonDown = false;
-            f32 endX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
-            f32 endY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
-            state->endP = {endX, endY};
-
-            state->rect.min.x = Min(state->startP.x, state->endP.x);
-            state->rect.min.y = Min(state->startP.y, state->endP.y);
-            state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
-            state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
-            ViewUpdateQuad(view, state->rect.min, state->rect.max, state->quadIndex);
-            state->updateOtherViewsPolys(state->rect, state->quadIndex);
-            ViewAddPolyPlane();
-        }
-        
-        if(state->leftButtonDown)
-        {
-            //  update the end position every frame to get real time
-            //  response to moving the mouse
-            f32 endX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
-            f32 endY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
-            state->endP = {endX, endY};
-
-            state->rect.min.x = Min(state->startP.x, state->endP.x);
-            state->rect.min.y = Min(state->startP.y, state->endP.y);
-            state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
-            state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
-            ViewUpdateQuad(view, state->rect.min, state->rect.max, state->quadIndex);
-            state->updateOtherViewsPolys(state->rect, state->quadIndex);
-        }
     }
 }

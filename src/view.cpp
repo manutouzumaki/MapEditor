@@ -599,8 +599,8 @@ void RenderPoly2D(View *view, Poly2D *poly, u32 color)
 void ViewOrthoBaseSetup(View *view)
 {
     ViewOrthoState *state = &view->orthoState;
-    state->wheelOffset = 5.0f;
-    state->zoom = Remap(0.0f, 50.0f, 0.05f, 10.0f, state->wheelOffset);
+    state->wheelOffset = 0.5f;
+    state->zoom = state->wheelOffset * state->wheelOffset;
 }
 
 void ViewOrthoBasePannelAndZoom(View *view)
@@ -626,9 +626,16 @@ void ViewOrthoBasePannelAndZoom(View *view)
         i32 mouseWheelDelta = MouseWheelDelta();
         if(mouseWheelDelta != 0)
         {
-            state->wheelOffset += (f32)mouseWheelDelta;
-            state->wheelOffset = Clamp(state->wheelOffset, 0.0f, 50.0f);
-            state->zoom = Remap(0.0f, 50.0f, 0.2f, 10.0f, state->wheelOffset);
+            if(mouseWheelDelta > 0)
+            {
+                state->wheelOffset *= 1.1f;
+            }
+            else
+            {
+                state->wheelOffset *= 0.9f;
+            }
+            state->wheelOffset = Max(0.1f, state->wheelOffset);
+            state->zoom = state->wheelOffset * state->wheelOffset;
         }
 
         f32 mouseWorldPostZoomX, mouseWorldPostZoomY;

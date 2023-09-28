@@ -3,6 +3,8 @@ cbuffer CBuffer : register(b0)
     matrix proj;
     matrix view;
     matrix world;
+    float3 viewPos;
+    float pad;
 }
 
 struct VS_Input

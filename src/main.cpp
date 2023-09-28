@@ -36,13 +36,13 @@ static VertexBuffer gVertexBuffer;
 static DynamicVertexBuffer gDynamicVertexBuffer;
 static Vertex gQuad[] = {
     // Face 1
-    {{-0.5f, -0.5f, 0}, {0.8, 0.8, 0.8, 1}, {0, 1}},
-    {{-0.5f,  0.5f, 0}, {0.8, 0.8, 0.8, 1}, {0, 0}},
-    {{ 0.5f, -0.5f, 0}, {0.8, 0.8, 0.8, 1}, {1, 1}},
+    {{-0.5f, -0.5f, 0}, {0, 0, 1}, {0.8, 0.8, 0.8, 1}, {0, 1}},
+    {{-0.5f,  0.5f, 0}, {0, 0, 1}, {0.8, 0.8, 0.8, 1}, {0, 0}},
+    {{ 0.5f, -0.5f, 0}, {0, 0, 1}, {0.8, 0.8, 0.8, 1}, {1, 1}},
     // Face 2
-    {{ 0.5f, -0.5f, 0}, {0.8, 0.8, 0.8, 1}, {1, 1}},
-    {{-0.5f,  0.5f, 0}, {0.8, 0.8, 0.8, 1}, {0, 0}},
-    {{ 0.5f,  0.5f, 0}, {0.8, 0.8, 0.8, 1}, {1, 0}}
+    {{ 0.5f, -0.5f, 0}, {0, 0, 1}, {0.8, 0.8, 0.8, 1}, {1, 1}},
+    {{-0.5f,  0.5f, 0}, {0, 0, 1}, {0.8, 0.8, 0.8, 1}, {0, 0}},
+    {{ 0.5f,  0.5f, 0}, {0, 0, 1}, {0.8, 0.8, 0.8, 1}, {1, 0}}
 };
 
 
@@ -100,10 +100,12 @@ int main()
     {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,
          0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,
+        {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT,
          0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,
+         0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,
-         0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0},
+         0, 40, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
     i32 totalLayoutElements = ARRAY_LENGTH(inputLayoutDesc);
     device->CreateInputLayout(inputLayoutDesc,
@@ -132,6 +134,7 @@ int main()
     cbuffer.view = Mat4LookAt(pos, tar, up);
     cbuffer.world = Mat4Identity();
     cbuffer.proj = Mat4Ortho(0.0f, (f32)WINDOW_WIDTH, 0.0f, (f32)WINDOW_HEIGHT, 0.0f, 100.0f);
+    cbuffer.viewPos = {};
     gConstBuffer = LoadConstBuffer((void *)&cbuffer, sizeof(CBuffer), 0);
 
     ShowWindow(window, SW_MAXIMIZE);
@@ -156,6 +159,8 @@ int main()
         
         // Swap main Buffer
         swapChain->Present(1, 0);
+
+        gLastInput = gInput;
     }
 
     ShutDownImGui();

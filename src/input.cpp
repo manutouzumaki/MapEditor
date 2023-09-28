@@ -20,7 +20,7 @@ struct Input
 };
 
 static Input gInput;
-
+static Input gLastInput;
 void InputPrepareForFrame()
 {
     gInput.wheelDelta = 0;
@@ -40,6 +40,16 @@ i32 MouseX()
 i32 MouseY()
 {
     return gInput.y;
+}
+
+i32 MouseLastX()
+{
+    return gLastInput.x;
+}
+
+i32 MouseLastY()
+{
+    return gLastInput.y;
 }
 
 i32 MouseWheelDelta()

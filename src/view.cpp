@@ -24,9 +24,22 @@ enum ViewId
     VIEW_COUNT
 };
 
+struct Camera
+{
+    Vec3 pos;
+    Vec3 rot;
+
+    Vec3 dir;
+    Vec3 right;
+    Vec3 up;
+};
+
 struct ViewPerspState
 {
-
+    bool leftButtonDown;
+    bool rightButtonDown;  
+    
+    Camera camera;
 };
 
 struct ViewOrthoState
@@ -328,11 +341,8 @@ static bool GetIntersection(Vec3 n1, Vec3 n2, Vec3 n3, f32 d1, f32 d2, f32 d3, V
         return false;
     }
     Vec3 pos = (-d1 * Vec3Cross(n2, n3) -d2 * Vec3Cross(n3, n1) -d3 * Vec3Cross(n1, n2)) / denom;
-    f32 r = InvLerp(0, 20, rand()%20);
-    f32 g = InvLerp(0, 20, rand()%20);
-    f32 b = InvLerp(0, 20, rand()%20);
-    Vec4 col = {r, g, b, 1.0f};
-    *vertex = {pos, col};
+    Vec4 col = {0.9, 0.7, 1, 1.0f};
+    *vertex = {pos, {}, col, {}};
     return true;
 }
 
@@ -392,9 +402,12 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
                     // TODO: add the vertex
                     Mat4 scaleMat = Mat4Scale(1.0f/128.0f, 1.0f/128.0f, 1.0f/128.0f);
                     vertex.position = Mat4TransformPoint(scaleMat, vertex.position);
-                    polygons[i].vertices[polygons[i].verticesCount++] = vertex;
-                    polygons[j].vertices[polygons[j].verticesCount++] = vertex;
-                    polygons[k].vertices[polygons[k].verticesCount++] = vertex;
+                    Vertex iVert = vertex; iVert.normal = poly->planes[i].n * -1.0f;
+                    Vertex jVert = vertex; jVert.normal = poly->planes[j].n * -1.0f;
+                    Vertex kVert = vertex; kVert.normal = poly->planes[k].n * -1.0f;
+                    polygons[i].vertices[polygons[i].verticesCount++] = iVert;
+                    polygons[j].vertices[polygons[j].verticesCount++] = jVert;
+                    polygons[k].vertices[polygons[k].verticesCount++] = kVert;
                 }
             }
         }

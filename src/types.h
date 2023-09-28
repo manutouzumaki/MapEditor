@@ -4,6 +4,7 @@
 struct Vertex
 {
     Vec3 position;
+    Vec3 normal;
     Vec4 color;
     Vec2 uv;
 };
@@ -68,6 +69,8 @@ struct CBuffer
     Mat4 proj;
     Mat4 view;
     Mat4 world;
+    Vec3 viewPos;
+    float pad;
 };
 
 struct Rect

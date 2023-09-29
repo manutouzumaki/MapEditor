@@ -57,6 +57,8 @@ struct ViewOrthoState
     bool middleButtonDown;
     bool rightButtonDown;
 
+    i32 controlPointDown;
+
     Vec2 startP;
     Vec2 endP;
     i32 quadIndex;
@@ -463,6 +465,75 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
 
 // TODO: remplace this function for a generic polygon function
 // not just cubes
+void ViewUpdatePolyPlane(i32 index)
+{
+    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
+    Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
+    Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
+
+    ASSERT(polyPlaneStorage->polygonsCount < ARRAY_LENGTH(polyPlaneStorage->polygons));
+
+    Poly2D *front = frontStorage->polygons + index;
+    Poly2D *side  = sideStorage->polygons  + index;
+
+    Vec2 xDim = {FLT_MAX, -FLT_MAX}; 
+    Vec2 yDim = {FLT_MAX, -FLT_MAX}; 
+    Vec2 zDim = {FLT_MAX, -FLT_MAX};
+
+    for(i32 i = 0; i < front->verticesCount; ++i)
+    {
+        Vec2 vertice = front->vertices[i];
+        if(vertice.x <= xDim.x)
+        {
+            xDim.x = vertice.x;
+        }
+        if(vertice.x >= xDim.y)
+        {
+            xDim.y = vertice.x;
+        }
+
+        if(vertice.y <= yDim.x)
+        {
+            yDim.x = vertice.y;
+        }
+        if(vertice.y >= yDim.y)
+        {
+            yDim.y = vertice.y;
+        }
+    }
+
+    for(i32 i = 0; i < side->verticesCount; ++i)
+    {
+        Vec2 vertice = side->vertices[i];
+        if(vertice.x <= zDim.x)
+        {
+            zDim.x = vertice.x;
+        }
+        if(vertice.x >= zDim.y)
+        {
+            zDim.y = vertice.x;
+        }
+    }
+
+    PolyPlane poly;
+    poly.planes[0] = { { 1,  0,  0}, -xDim.y };
+    poly.planes[1] = { {-1,  0,  0},  xDim.x };
+    poly.planes[2] = { { 0,  1,  0}, -yDim.y };
+    poly.planes[3] = { { 0, -1,  0},  yDim.x };
+    poly.planes[4] = { { 0,  0,  1}, -zDim.y };
+    poly.planes[5] = { { 0,  0, -1},  zDim.x };
+    poly.planesCount = 6;
+    polyPlaneStorage->polygons[index] = poly;
+
+    // reload the dynamic vertex buffer
+    gDynamicVertexBuffer.used = 0;
+    for(i32 i = 0; i < polyPlaneStorage->polygonsCount; ++i)
+    {
+        PushPolyPlaneToVertexBuffer(polyPlaneStorage->polygons + i);
+    }
+
+}
+
 i32 ViewAddPolyPlane()
 {
     PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;

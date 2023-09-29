@@ -205,8 +205,8 @@ void EditorModeModifyPoly(View *view)
     if(gCurrentEditorMode != EDITOR_MODE_MODIFY_POLY)
         return;
 
-    if(!MouseIsHot(view)) 
-        return;
+    //if(!MouseIsHot(view)) 
+    //    return;
 
 
     ViewOrthoState *state = &view->orthoState;
@@ -261,19 +261,21 @@ void EditorModeModifyPoly(View *view)
     f32 currentX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
     f32 currentY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
 
-    static i32 controlPointDown = -1;
-
     for(i32 i = 0; i < CONTROL_POINT_COUNT; ++i)
     {
         if(MouseInControlPoint(view, controlP[i]))
         {
-            if(MouseJustDown(MOUSE_BUTTON_LEFT)) controlPointDown = i;
+            if(MouseJustDown(MOUSE_BUTTON_LEFT))
+            {
+                state->leftButtonDown = true;
+                state->controlPointDown = i;
+            }
         }
     }
 
-    if(controlPointDown > -1)
+    if(state->leftButtonDown)
     {
-        switch(controlPointDown)
+        switch(state->controlPointDown)
         {
             // TODO: we have to move tree vertices
             case CONTROL_POINT_BOTL:
@@ -363,9 +365,10 @@ void EditorModeModifyPoly(View *view)
     }
 
 
-    if(MouseJustUp(MOUSE_BUTTON_LEFT))
+    if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown)
     {
-        controlPointDown = -1;
+        state->leftButtonDown = false;
+        state->controlPointDown = -1;
         state->rect.min.x = botL.x;
         state->rect.min.y = botL.y;
         state->rect.max.x = topR.x;
@@ -374,5 +377,6 @@ void EditorModeModifyPoly(View *view)
         // TODO: fix this ...
         // update dynamic vertex buffer
         state->updateOtherViewsPolys(state->rect, selectedPoly, 0xFFFFFFAA);
+        ViewUpdatePolyPlane(selectedPoly);
     }
 }

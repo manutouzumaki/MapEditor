@@ -25,22 +25,24 @@ static void AddFrontAndTopViewsPolys(Vec2 startP, Vec2 endP, u32 color)
 
 static void UpdateFrontAndTopViewsPolys(RectMinMax rect, i32 quadIndex, u32 color)
 {
-    Poly2D poly;
 
     Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT; 
-    poly.vertices[0] = {0, rect.max.y};
-    poly.vertices[1] = {gUnitSize, rect.max.y};
-    poly.vertices[2] = {gUnitSize, rect.min.y};
-    poly.vertices[3] = {0, rect.min.y};
+    Poly2D poly = frontStorage->polygons[quadIndex];
+    poly.vertices[0] = {poly.vertices[0].x, rect.max.y};
+    poly.vertices[1] = {poly.vertices[1].x, rect.max.y};
+    poly.vertices[2] = {poly.vertices[2].x, rect.min.y};
+    poly.vertices[3] = {poly.vertices[3].x, rect.min.y};
     poly.verticesCount = 4;
     poly.color = color;
     frontStorage->polygons[quadIndex] = poly;
     
+
     Poly2DStorage *topStorage = gSharedMemory.poly2dStorage + VIEW_TOP;
-    poly.vertices[0] = {0, rect.max.x};
-    poly.vertices[1] = {gUnitSize, rect.max.x};
-    poly.vertices[2] = {gUnitSize, rect.min.x};
-    poly.vertices[3] = {0, rect.min.x};
+    poly = topStorage->polygons[quadIndex];
+    poly.vertices[0] = {poly.vertices[0].x, rect.max.x};
+    poly.vertices[1] = {poly.vertices[1].x, rect.max.x};
+    poly.vertices[2] = {poly.vertices[2].x, rect.min.x};
+    poly.vertices[3] = {poly.vertices[3].x, rect.min.x};
     poly.verticesCount = 4;
     poly.color = color;
     topStorage->polygons[quadIndex] = poly;
@@ -54,6 +56,7 @@ void SetupSideView(View *view)
     ViewOrthoBaseSetup(view);
     state->addOtherViewsPolys = AddFrontAndTopViewsPolys;
     state->updateOtherViewsPolys = UpdateFrontAndTopViewsPolys;
+    state->controlPointDown = -1;
 }
 
 void ProcessSideView(View *view)

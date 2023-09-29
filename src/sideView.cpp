@@ -57,6 +57,7 @@ void SetupSideView(View *view)
     state->addOtherViewsPolys = AddFrontAndTopViewsPolys;
     state->updateOtherViewsPolys = UpdateFrontAndTopViewsPolys;
     state->controlPointDown = -1;
+    view->mousePicking = MousePicking2D;
 }
 
 void ProcessSideView(View *view)
@@ -65,6 +66,7 @@ void ProcessSideView(View *view)
 
     EditorModeAddPoly(view);
     EditorModeModifyPoly(view);
+    EditorModeSelectPoly(view);
 }
 
 void RenderSideView(View *view)

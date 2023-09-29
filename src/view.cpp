@@ -7,6 +7,8 @@ typedef void (*RenderFNP) (View *view);
 typedef void (*AddOtherViewsPolysFNP) (Vec2 start, Vec2 end, u32 color);
 typedef void (*UpdateOtherViewsPolysFNP) (RectMinMax rect, i32 quadIndex, u32 color);
 
+typedef i32 (*MousePickingFNP) (View *view);
+
 
 enum ProjType
 {
@@ -84,6 +86,8 @@ struct View
     SetupFNP setup;
     ProcessFNP process;
     RenderFNP render;
+
+    MousePickingFNP mousePicking;
 };
 
 View ViewCreate(f32 x, f32 y, f32 w, f32 h, ProjType projType,

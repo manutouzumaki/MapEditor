@@ -53,6 +53,7 @@ void SetupTopView(View *view)
     state->addOtherViewsPolys = AddFrontAndSideViewsPolys;
     state->updateOtherViewsPolys = UpdateFrontAndSideViewsPolys;
     state->controlPointDown = -1;
+    view->mousePicking = MousePicking2D;
 }
 
 void ProcessTopView(View *view)
@@ -61,6 +62,7 @@ void ProcessTopView(View *view)
 
     EditorModeAddPoly(view);
     EditorModeModifyPoly(view);
+    EditorModeSelectPoly(view);
 }
 
 void RenderTopView(View *view)

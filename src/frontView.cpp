@@ -54,6 +54,8 @@ void SetupFrontView(View *view)
     ViewOrthoBaseSetup(view);
     state->addOtherViewsPolys = AddSideAndTopViewsPolys;
     state->updateOtherViewsPolys = UpdateSideAndTopViewsPolys;
+    state->controlPointDown = -1;
+    view->mousePicking = MousePicking2D;
 }
 
 void ProcessFrontView(View *view)
@@ -62,6 +64,7 @@ void ProcessFrontView(View *view)
 
     EditorModeAddPoly(view);
     EditorModeModifyPoly(view);
+    EditorModeSelectPoly(view);
 }
 
 void RenderFrontView(View *view)

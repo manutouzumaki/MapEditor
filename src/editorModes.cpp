@@ -1,6 +1,8 @@
 void EditorModeMove3DCamera(View *view)
 {
-    if(gCurrentEditorMode != EDITOR_MODE_MOVE_3D_CAMERA)
+    // TODO: see how we want to handle this ...
+    //if(gCurrentEditorMode != EDITOR_MODE_MOVE_3D_CAMERA)
+    if(gCurrentEditorMode == EDITOR_MODE_SELECT_POLY)
         return;
 
     ViewPerspState *state = &view->perspState;
@@ -130,6 +132,7 @@ void EditorModeAddPoly(View *view)
             ViewUpdateQuad(view, state->rect.min, state->rect.max, state->quadIndex);
             state->updateOtherViewsPolys(state->rect, state->quadIndex, 0xFFFFFFAA);
             ViewAddPolyPlane();
+            gSharedMemory.selectedPolygon = state->quadIndex;
             gCurrentEditorMode = EDITOR_MODE_MODIFY_POLY;
         }
         
@@ -211,8 +214,7 @@ void EditorModeModifyPoly(View *view)
 
     ViewOrthoState *state = &view->orthoState;
 
-    //i32 selectedPoly = gSharedMemory.selectedPolygon;
-    i32 selectedPoly = 0;//gSharedMemory.selectedPolygon;
+    i32 selectedPoly = gSharedMemory.selectedPolygon;
     Poly2DStorage *viewStorage = ViewGetPoly2DStorage(view);
 
     if(selectedPoly < 0 || selectedPoly >= ARRAY_LENGTH(viewStorage->polygons))
@@ -378,5 +380,92 @@ void EditorModeModifyPoly(View *view)
         // update dynamic vertex buffer
         state->updateOtherViewsPolys(state->rect, selectedPoly, 0xFFFFFFAA);
         ViewUpdatePolyPlane(selectedPoly);
+    }
+}
+
+bool PointHitPoly2D(Poly2D *poly, f32 x, f32 y, f32 zoom)
+{
+    Vec2 mouseP = {x, y};
+    for(i32 i = 0; i < poly->verticesCount; ++i)
+    {
+        if(i == 1)
+            i32 stophere = 1;
+
+        Vec2 a = poly->vertices[(i + 0) % poly->verticesCount];
+        Vec2 b = poly->vertices[(i + 1) % poly->verticesCount];
+        Vec2 ab = b - a;
+
+        // create the rect orthonormal basis
+        Vec2 o = a + ab * 0.5f;
+        Vec2 r = Vec2Normalized(ab);
+        Vec2 u = Vec2Normalized({-r.y ,r.x});
+        
+        Vec2 testP = mouseP - o;
+
+        // transform the mouse world coord the the rect basis
+        f32 localX = Vec2Dot(r, testP);
+        f32 localY = Vec2Dot(u, testP);
+
+        i32 StopHere = 0;
+
+        // AABB point intersection check
+        f32 hW = Vec2Len(ab) * 0.5f;
+        f32 hH = 2*(1.0f/zoom);
+
+        if(localX >= -hW && localX <= hW &&
+           localY >= -hH && localY <= hH)
+        {
+            return true;
+        }
+
+    }
+    return false;
+}
+
+i32 MousePicking2D(View *view)
+{
+
+    ViewOrthoState *state = &view->orthoState;
+
+    i32 mouseRelX = MouseRelX(view);
+    i32 mouseRelY = MouseRelY(view);
+
+    f32 mouseWorldX, mouseWorldY;
+    ScreenToWorld(mouseRelX, mouseRelY, mouseWorldX, mouseWorldY,
+                  state->offsetX, state->offsetY, state->zoom);
+
+    Poly2DStorage *viewStorage = ViewGetPoly2DStorage(view);
+
+    // loop over every polygon in the list
+    for(i32 i = 0; i < viewStorage->polygonsCount; ++i)
+    {
+        Poly2D *poly = viewStorage->polygons + i;
+        if(PointHitPoly2D(poly, mouseWorldX, mouseWorldY, state->zoom))
+        {
+            return i;
+        }
+    }
+
+    return -1;
+
+}
+
+i32 MousePicking3D(View *view)
+{
+    return -1;
+}
+
+void EditorModeSelectPoly(View *view)
+{
+    if(gCurrentEditorMode != EDITOR_MODE_SELECT_POLY)
+        return;
+
+    if(MouseIsHot(view) && MouseJustDown(MOUSE_BUTTON_LEFT))
+    {
+        gSharedMemory.selectedPolygon = view->mousePicking(view);
+        if(gSharedMemory.selectedPolygon >= 0)
+        {
+            gCurrentEditorMode = EDITOR_MODE_MODIFY_POLY;
+        }
     }
 }

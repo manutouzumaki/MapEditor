@@ -12,8 +12,8 @@ float4 fs_main(FragmentIn i) : SV_TARGET
     float3 color = i.col.rgb;
     float3 lightPos = i.viewPos; 
     float3 lightColor = float3(1.0f, 1.0f, 1.0f);
-    //float3 lightDir = normalize(float3(-0.2, -0.5, 0.6));
-    float3 lightDir = normalize(i.fragPos - lightPos);
+    float3 lightDir = normalize(float3(-0.2, -0.5, 0.6));
+    //float3 lightDir = normalize(i.fragPos - lightPos);
 
     // ambient
     float ambientStrength = 0.2f;
@@ -28,7 +28,8 @@ float4 fs_main(FragmentIn i) : SV_TARGET
     float spec = pow(max(dot(viewDir, reflectDir), 0.0f), 32.0f); 
     float3 specular = mul(spec * lightColor, specularStrength);
 
-    float3 result = (ambient + diffuse + specular) * color;
+    //float3 result = (ambient + diffuse + specular) * color;
+    float3 result = (ambient + diffuse) * color;
 
     return float4(result, 1.0f);
 }

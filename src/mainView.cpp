@@ -8,11 +8,14 @@ void SetupMainView(View *view)
     state->camera.up = {0, 1, 0};
     state->camera.pos = {0, 2.5, -5};
     state->camera.rot = {0, 0, 0};
+
+    view->mousePicking = MousePicking3D;
 }
 
 void ProcessMainView(View *view)
 {
     EditorModeMove3DCamera(view);
+    EditorModeSelectPoly(view);
 }
 
 void RenderMainView(View *view)

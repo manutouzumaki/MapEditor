@@ -317,12 +317,10 @@ Poly2DStorage *ViewGetPoly2DStorage(View *view)
 
 static bool GetIntersection(Vec3 n1, Vec3 n2, Vec3 n3, f32 d1, f32 d2, f32 d3, Vertex *vertex)
 {
-    f32 denom = Vec3Dot(n1, Vec3Cross(n2, n3));
-    if(denom <= FLT_EPSILON && denom >= -FLT_EPSILON)
-    {
-        return false;
-    }
-    Vec3 pos = (-d1 * Vec3Cross(n2, n3) -d2 * Vec3Cross(n3, n1) -d3 * Vec3Cross(n1, n2)) / denom;
+    Vec3 u = Vec3Cross(n2, n3);
+    f32 denom = Vec3Dot(n1, u);
+    if(fabsf(denom) < FLT_EPSILON) return false;
+    Vec3 pos = (d1 * u + Vec3Cross(n1, d3 * n2 - d2 * n3)) / denom;
     Vec4 col = {0.9, 0.7, 1, 1.0f};
     *vertex = {pos, {}, col, {}};
     return true;
@@ -330,12 +328,12 @@ static bool GetIntersection(Vec3 n1, Vec3 n2, Vec3 n3, f32 d1, f32 d2, f32 d3, V
 
 static Plane GetPlaneFromThreePoints(Vec3 a, Vec3 b, Vec3 c)
 {
-    Plane plane;
-    Vec3 ab = b - a;
-    Vec3 ac = c - a;
-    Vec3 n = Vec3Normalized(Vec3Cross(ab, ac));
-    f32 d = -n.x*a.x -n.y*a.y -n.z*a.z;
-    return {n, d};
+
+    Plane p;
+    p.n = Vec3Normalized(Vec3Cross(b - a, c - a));
+    p.d = Vec3Dot(p.n, a);
+    return p;
+
 }
 
 static Vec3 GetCenterOfPolygon(Poly3D *polygon)
@@ -373,8 +371,8 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
                     Plane plane = poly->planes[m];
                     f32 dot = Vec3Dot(plane.n, vertex.position);
                     f32 d = plane.d;
-                    f32 test = dot + d;
-                    if(test > EPSILON)
+                    f32 dist = dot - d;
+                    if(dist > EPSILON)
                     {
                         illegal = true;
                     }
@@ -384,9 +382,9 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
                     // TODO: add the vertex
                     Mat4 scaleMat = Mat4Scale(1.0f/g3DScale, 1.0f/g3DScale, 1.0f/g3DScale);
                     vertex.position = Mat4TransformPoint(scaleMat, vertex.position);
-                    Vertex iVert = vertex; iVert.normal = poly->planes[i].n * -1.0f;
-                    Vertex jVert = vertex; jVert.normal = poly->planes[j].n * -1.0f;
-                    Vertex kVert = vertex; kVert.normal = poly->planes[k].n * -1.0f;
+                    Vertex iVert = vertex; iVert.normal = poly->planes[i].n;// * -1.0f;
+                    Vertex jVert = vertex; jVert.normal = poly->planes[j].n;// * -1.0f;
+                    Vertex kVert = vertex; kVert.normal = poly->planes[k].n;// * -1.0f;
                     polygons[i].vertices[polygons[i].verticesCount++] = iVert;
                     polygons[j].vertices[polygons[j].verticesCount++] = jVert;
                     polygons[k].vertices[polygons[k].verticesCount++] = kVert;
@@ -419,7 +417,7 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
             for(i32 m = n + 1; m <= polygon->verticesCount - 1; ++m)
             {
                 Vertex vertex = polygon->vertices[m];
-                if((Vec3Dot(p.n, vertex.position) + p.d) > 0.0f)
+                if((Vec3Dot(p.n, vertex.position) - p.d) > 0.0f)
                 {
                     Vec3 b = Vec3Normalized(vertex.position - center);
                     f32 angle = Vec3Dot(a, b);
@@ -437,7 +435,7 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
                 polygon->vertices[n + 1] = polygon->vertices[smallest];
                 polygon->vertices[smallest] = tmp;
             }
-        } 
+        }
     }
 
     Vertex *vertices = 0;
@@ -469,6 +467,19 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
 
 // TODO: remplace this function for a generic polygon function
 // not just cubes
+PolyPlane CreatePolyPlane(Vec2 xMinMax, Vec2 yMinMax, Vec2 zMinMax)
+{
+    PolyPlane poly;
+    poly.planes[0] = { { 1,  0,  0},  xMinMax.y };
+    poly.planes[1] = { {-1,  0,  0}, -xMinMax.x };
+    poly.planes[2] = { { 0,  1,  0},  yMinMax.y };
+    poly.planes[3] = { { 0, -1,  0}, -yMinMax.x };
+    poly.planes[4] = { { 0,  0,  1},  zMinMax.y };
+    poly.planes[5] = { { 0,  0, -1}, -zMinMax.x };
+    poly.planesCount = 6;
+    return poly;
+}
+
 void ViewUpdatePolyPlane(i32 index)
 {
     PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
@@ -519,14 +530,7 @@ void ViewUpdatePolyPlane(i32 index)
         }
     }
 
-    PolyPlane poly;
-    poly.planes[0] = { { 1,  0,  0}, -xDim.y };
-    poly.planes[1] = { {-1,  0,  0},  xDim.x };
-    poly.planes[2] = { { 0,  1,  0}, -yDim.y };
-    poly.planes[3] = { { 0, -1,  0},  yDim.x };
-    poly.planes[4] = { { 0,  0,  1}, -zDim.y };
-    poly.planes[5] = { { 0,  0, -1},  zDim.x };
-    poly.planesCount = 6;
+    PolyPlane poly = CreatePolyPlane(xDim, yDim, zDim);
     polyPlaneStorage->polygons[index] = poly;
 
     // reload the dynamic vertex buffer
@@ -589,14 +593,7 @@ i32 ViewAddPolyPlane()
         }
     }
 
-    PolyPlane poly;
-    poly.planes[0] = { { 1,  0,  0}, -xDim.y };
-    poly.planes[1] = { {-1,  0,  0},  xDim.x };
-    poly.planes[2] = { { 0,  1,  0}, -yDim.y };
-    poly.planes[3] = { { 0, -1,  0},  yDim.x };
-    poly.planes[4] = { { 0,  0,  1}, -zDim.y };
-    poly.planes[5] = { { 0,  0, -1},  zDim.x };
-    poly.planesCount = 6;
+    PolyPlane poly = CreatePolyPlane(xDim, yDim, zDim);
     polyPlaneStorage->polygons[index] = poly;
 
     PushPolyPlaneToVertexBuffer(&poly);

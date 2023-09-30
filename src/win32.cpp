@@ -282,7 +282,7 @@ static void InitD3D11(HWND window)
     deviceContext->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
     deviceContext->OMSetDepthStencilState(depthStencilOn, 1);
     deviceContext->OMSetBlendState(alphaBlendEnable, 0, 0xffffffff);
-    deviceContext->RSSetState(fillRasterizerCullBack);
+    deviceContext->RSSetState(fillRasterizerCullNone);
     deviceContext->PSSetSamplers(0, 1, &gSamplerState);
 }
 

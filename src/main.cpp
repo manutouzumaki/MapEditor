@@ -169,7 +169,7 @@ int main()
     cbuffer.view = Mat4LookAt(pos, tar, up);
     cbuffer.world = Mat4Identity();
     cbuffer.proj = Mat4Ortho(0.0f, (f32)WINDOW_WIDTH, 0.0f, (f32)WINDOW_HEIGHT, 0.0f, 100.0f);
-    cbuffer.viewPos = {};
+    cbuffer.viewDir = {};
     gConstBuffer = LoadConstBuffer((void *)&cbuffer, sizeof(CBuffer), 0);
 
     ShowWindow(window, SW_MAXIMIZE);

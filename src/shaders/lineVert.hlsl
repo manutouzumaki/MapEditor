@@ -3,7 +3,7 @@ cbuffer CBuffer : register(b0)
     matrix proj;
     matrix view;
     matrix world;
-    float3 viewPos;
+    float3 viewDir;
     float pad;
 }
 

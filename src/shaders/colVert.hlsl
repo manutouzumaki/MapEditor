@@ -3,7 +3,7 @@ cbuffer CBuffer : register(b0)
     matrix proj;
     matrix view;
     matrix wolrd;
-    float3 viewPos;
+    float3 viewDir;
     float pad;
 }
 
@@ -21,7 +21,7 @@ struct VertexOut
     float4 col : COLOR;
     float3 nor : NORMAL;
     float3 fragPos : TEXCOORD0;
-    float3 viewPos : TEXCOORD1;
+    float3 viewDir : TEXCOORD1;
 };
 
 VertexOut vs_main(VertexIn i)
@@ -40,7 +40,7 @@ VertexOut vs_main(VertexIn i)
     o.col = i.col;
     o.nor = wNor;
     o.fragPos = wPos.xyz;
-    o.viewPos = viewPos;
+    o.viewDir = viewDir;
 
     return o;
 }

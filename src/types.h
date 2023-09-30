@@ -69,7 +69,7 @@ struct CBuffer
     Mat4 proj;
     Mat4 view;
     Mat4 world;
-    Vec3 viewPos;
+    Vec3 viewDir;
     float pad;
 };
 

@@ -7,6 +7,8 @@ void EditorModeMove3DCamera(View *view)
 
     ViewPerspState *state = &view->perspState;
 
+    printf("CameraP x: %f y: %f z: %f\n", state->camera.pos.x, state->camera.pos.y, state->camera.pos.z);
+
     if(MouseIsHot(view))
     {
         if(MouseJustDown(MOUSE_BUTTON_LEFT))
@@ -90,7 +92,7 @@ void EditorModeMove3DCamera(View *view)
     state->camera.up =  Vec3Normalized(Vec3Cross(state->camera.right, state->camera.dir));
 
     view->cbuffer.view = Mat4LookAt(state->camera.pos, state->camera.pos + state->camera.dir, {0, 1, 0});
-    view->cbuffer.viewPos = state->camera.pos;
+    view->cbuffer.viewDir = state->camera.dir;
 }
 
 void EditorModeAddPoly(View *view)
@@ -483,7 +485,7 @@ static bool RayHitPolyPlane(Ray ray, PolyPlane *poly, f32 *tOut)
     {
         Plane p = poly->planes[i];
         f32 denom = Vec3Dot(p.n, d);
-        f32 dist = -(p.d / g3DScale) - Vec3Dot(p.n, a);
+        f32 dist = (p.d / g3DScale) - Vec3Dot(p.n, a);
         // test if segment runs parallel to tha plane
         if(denom == 0.0f)
         {

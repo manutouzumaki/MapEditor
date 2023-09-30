@@ -467,6 +467,37 @@ struct Vec4 {
     }
 };
 
+f32 Vec4Dot(Vec4 a, Vec4 b) {
+    f32 result = (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w + b.w);
+    return result;
+}
+
+f32 Vec4LenSq(Vec4 v) {
+    f32 result = Vec4Dot(v, v);
+    return result;
+
+}
+
+f32 Vec4Len(Vec4 v)
+{
+    return sqrtf(Vec4Dot(v, v));
+}
+
+Vec4 Vec4Normalized(Vec4 v) {
+    f32 lenSq = Vec4LenSq(v);
+    if(lenSq < VEC_EPSILON) {
+        return v;
+    }
+    f32 invLen = 1.0f / sqrtf(lenSq);
+    Vec4 result{
+        result.x = v.x * invLen,
+        result.y = v.y * invLen,
+        result.z = v.z * invLen,
+        result.w = v.w * invLen,
+    };
+    return result;
+}
+
 struct Mat3 
 {
     union

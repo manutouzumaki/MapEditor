@@ -376,8 +376,6 @@ void EditorModeModifyPoly(View *view)
         state->rect.max.x = topR.x;
         state->rect.max.y = topR.y;
         ViewUpdateQuad(view, state->rect.min, state->rect.max, selectedPoly);
-        // TODO: fix this ...
-        // update dynamic vertex buffer
         state->updateOtherViewsPolys(state->rect, selectedPoly, 0xFFFFFFAA);
         ViewUpdatePolyPlane(selectedPoly);
     }
@@ -400,18 +398,15 @@ bool PointHitPoly2D(Poly2D *poly, f32 x, f32 y, f32 zoom)
         Vec2 r = Vec2Normalized(ab);
         Vec2 u = Vec2Normalized({-r.y ,r.x});
         
-        Vec2 testP = mouseP - o;
 
         // transform the mouse world coord the the rect basis
+        Vec2 testP = mouseP - o;
         f32 localX = Vec2Dot(r, testP);
         f32 localY = Vec2Dot(u, testP);
-
-        i32 StopHere = 0;
 
         // AABB point intersection check
         f32 hW = Vec2Len(ab) * 0.5f;
         f32 hH = 2*(1.0f/zoom);
-
         if(localX >= -hW && localX <= hW &&
            localY >= -hH && localY <= hH)
         {
@@ -450,9 +445,103 @@ i32 MousePicking2D(View *view)
 
 }
 
+static Ray GetMouseRay(View *view, f32 x, f32 y) 
+{
+    ViewPerspState *state = &view->perspState;
+
+    Mat4 invView = Mat4Inverse(view->cbuffer.view);
+    Mat4 invProj = Mat4Inverse(view->cbuffer.proj);
+
+    Vec4 rayClip;
+    rayClip.x = 2.0f * x / view->w - 1.0f;
+    rayClip.y = 1.0f - (2.0f * y) / view->h;
+    rayClip.z = 1.0f;
+    rayClip.w = 1.0f;
+    Vec4 rayEye = invProj * rayClip;
+    rayEye.z =  1.0f;
+    rayEye.w =  0.0f;
+    Vec4 rayWorld = invView * rayEye;
+    rayWorld = Vec4Normalized(rayWorld);
+
+    Ray ray;
+    ray.o = state->camera.pos;
+    ray.d = {rayWorld.x, rayWorld.y, rayWorld.z};
+    Vec3Normalize(&ray.d);
+    return ray;
+}
+
+static bool RayHitPolyPlane(Ray ray, PolyPlane *poly, f32 *tOut)
+{
+    Vec3 a = ray.o;
+    Vec3 d = ray.d;
+    // Set initial interval to being the whole segment. For a ray, tlast should be
+    // sety to FLT_MAX. For a line tfirst should be set to - FLT_MAX
+    f32 tFirst = 0;
+    f32 tLast = FLT_MAX;
+    // intersect segment agains each plane
+    for(i32 i = 0; i < poly->planesCount; ++i)
+    {
+        Plane p = poly->planes[i];
+        f32 denom = Vec3Dot(p.n, d);
+        f32 dist = -(p.d / g3DScale) - Vec3Dot(p.n, a);
+        // test if segment runs parallel to tha plane
+        if(denom == 0.0f)
+        {
+            // If so, return "no intersection" if segemnt lies outside the plane
+            if(dist > 0.0f) return 0;
+        }
+        else
+        {
+            f32 t = dist / denom;
+            if(denom < 0.0f)
+            {
+                // when entering halfspace, update tfirst if t is larger
+                if(t > tFirst) tFirst = t;
+            }
+            else
+            {
+                // when exiting halfspace, update tLast if t is smaller
+                if(t < tLast) tLast = t;
+            }
+
+            if(tFirst > tLast) return 0;
+        }
+    }
+    *tOut = tFirst;
+    return 1;
+}
+
 i32 MousePicking3D(View *view)
 {
-    return -1;
+    PolyPlaneStorage *viewStorage = &gSharedMemory.polyPlaneStorage; 
+
+    // get the mouse relative to the view but from the bottom up
+    i32 mouseRelX = MouseRelX(view) + view->w * 0.5f;
+    i32 mouseRelY = view->h - (MouseRelY(view) + view->h * 0.5f);
+
+    Ray ray = GetMouseRay(view, mouseRelX, mouseRelY); 
+
+    // loop over every polygon in the list and save the hitPoint with
+    // the smallest t value
+    f32 tMin = FLT_MAX;
+    i32 hitIndex = -1;
+    for(i32 i = 0; i < viewStorage->polygonsCount; ++i)
+    {
+        PolyPlane *poly = viewStorage->polygons + i;
+        f32 t = -1.0f;
+        if(RayHitPolyPlane(ray, poly, &t))
+        {
+            printf("%d: %f\n", i, t);
+            if(t < tMin)
+            {
+                tMin = t;
+                hitIndex = i;
+            }
+        }
+    }
+
+
+    return hitIndex;
 }
 
 void EditorModeSelectPoly(View *view)

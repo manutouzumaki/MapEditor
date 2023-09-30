@@ -382,7 +382,7 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
                 if(illegal == false)
                 {
                     // TODO: add the vertex
-                    Mat4 scaleMat = Mat4Scale(1.0f/128.0f, 1.0f/128.0f, 1.0f/128.0f);
+                    Mat4 scaleMat = Mat4Scale(1.0f/g3DScale, 1.0f/g3DScale, 1.0f/g3DScale);
                     vertex.position = Mat4TransformPoint(scaleMat, vertex.position);
                     Vertex iVert = vertex; iVert.normal = poly->planes[i].n * -1.0f;
                     Vertex jVert = vertex; jVert.normal = poly->planes[j].n * -1.0f;

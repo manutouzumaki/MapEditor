@@ -108,6 +108,12 @@ struct Plane
     f32 d;
 };
 
+struct Ray
+{
+    Vec3 o;
+    Vec3 d;
+};
+
 struct PolyPlane
 {
     Plane planes[255];

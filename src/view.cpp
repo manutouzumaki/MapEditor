@@ -438,6 +438,31 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
         }
     }
 
+    // Set UVs
+    for(i32 i = 0; i < poly->planesCount; ++i)
+    {
+        // for now all our polys have for vertices
+        // so we cant hard code the valus TODO: change this for a more general code
+ 
+        Vec2 uvs[4] = {
+            {0, 0}, {1, 0}, {1, 1}, {0, 1}
+        };
+
+        Poly3D *polyD = &polygons[i];
+        for(i32 j = 0; j < polyD->verticesCount; ++j)
+        {
+            Vec2 uv = uvs[j];
+
+            Vec3 wVec =  polyD->vertices[0].position - polyD->vertices[1].position;
+            Vec3 hVec =  polyD->vertices[1].position - polyD->vertices[2].position;
+
+            uv.x *= Vec3Len(wVec) * 0.5f;
+            uv.y *= Vec3Len(hVec) * 0.5f;
+
+            polyD->vertices[j].uv = uv;
+        }
+    }
+
     Vertex *vertices = 0;
     
     for(i32 i = 0; i < poly->planesCount; ++i)

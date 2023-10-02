@@ -33,12 +33,14 @@ static f32 gCurrentWindowHeight = WINDOW_HEIGHT;
 static f32 gFixWidth = 200.0f;
 static f32 gUnitSize = 64.0f;
 static f32 gGridSize = 200.0f;
-static f32 g3DScale = 128.0f;
+static f32 g3DScale = 32.0f;
 
 // global variables for use during rendering
 static Shader gColShader;
 static Shader gCol2DShader;
 static Shader gTexShader;
+static Shader gTex2DShader;
+
 static ConstBuffer gConstBuffer;
 static VertexBuffer gVertexBuffer;
 static DynamicVertexBuffer gDynamicVertexBuffer;
@@ -123,7 +125,9 @@ void ProcessWindowResize(ViewManager *vm, CBuffer *cbuffer, f32 &clientWidth, Re
     } 
 }
 
-int main()
+
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+//int main()
 {
     HINSTANCE instace = GetModuleHandle(0);
     HWND window = InitWindow(instace);
@@ -135,6 +139,7 @@ int main()
     gColShader = LoadShader("../src/shaders/colVert.hlsl", "../src/shaders/colFrag.hlsl");
     gCol2DShader = LoadShader("../src/shaders/col2dVert.hlsl", "../src/shaders/col2dFrag.hlsl");
     gTexShader = LoadShader("../src/shaders/texVert.hlsl", "../src/shaders/texFrag.hlsl");
+    gTex2DShader = LoadShader("../src/shaders/tex2dVert.hlsl", "../src/shaders/tex2dFrag.hlsl");
     
     ID3D11InputLayout *layout = 0;
     D3D11_INPUT_ELEMENT_DESC inputLayoutDesc[] =
@@ -178,14 +183,14 @@ int main()
     cbuffer.viewDir = {};
     gConstBuffer = LoadConstBuffer((void *)&cbuffer, sizeof(CBuffer), 0);
 
-    gAtlas = LoadTextureAtlas(256*2, 256);
+    gAtlas = LoadTextureAtlas(256, 256);
 
-    AddTextureToTextureAtlas(&gAtlas, "../assets/brick.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/wood.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/cool.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/grass.png");
+    //AddTextureToTextureAtlas(&gAtlas, "../assets/grass.png");
+    //AddTextureToTextureAtlas(&gAtlas, "../assets/brick.png");
+    //AddTextureToTextureAtlas(&gAtlas, "../assets/wood.png");
+    //AddTextureToTextureAtlas(&gAtlas, "../assets/cool.png");
     AddTextureToTextureAtlas(&gAtlas, "../assets/noTexture.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/short.png");
+    //AddTextureToTextureAtlas(&gAtlas, "../assets/short.png");
 
     ShowWindow(window, SW_MAXIMIZE);
 
@@ -232,7 +237,8 @@ int main()
     UnloadVertexBuffer(&gVertexBuffer);
     UnloadDynamicVertexBuffer(&gDynamicVertexBuffer);
     UnloadShader(&gColShader);
-    UnloadShader(&gTexShader);
+    UnloadShader(&gCol2DShader);
+    UnloadShader(&gTex2DShader);
     UnloadConstBuffer(&gConstBuffer);
     
     ViewManagerShutDown(&vm);

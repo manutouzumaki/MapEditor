@@ -18,29 +18,16 @@ struct VertexIn
 struct VertexOut
 {
     float4 pos : SV_POSITION;
-    float3 nor : NORMAL;
-    float2 uv : TEXCOORD0;
-    float3 fragPos : TEXCOORD1;
-    float3 viewDir : TEXCOORD2;
+    float2 uv  : TEXCOORD0;
 };
 
 VertexOut vs_main(VertexIn i)
 {
-
     VertexOut o = (VertexOut)0;
-
     float4 wPos =  mul(float4(i.pos, 1.0f), wolrd);
     wPos = mul(wPos, view);
     wPos = mul(wPos, proj);
-
-    float3 wNor = mul(i.nor, (float3x3)wolrd);
-    wNor = normalize(wNor);
-
     o.pos = wPos;
     o.uv = i.uv;
-    o.nor = wNor;
-    o.fragPos = wPos.xyz;
-    o.viewDir = viewDir;
-
     return o;
 }

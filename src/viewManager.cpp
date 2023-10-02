@@ -187,8 +187,8 @@ void ViewManagerRenderViews(ViewManager *vm, CBuffer *cbuffer, Rect clientRect)
     deviceContext->ClearRenderTargetView(renderTargetView, clearColor);
     deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
 
-    deviceContext->VSSetShader(gTexShader.vertex, 0, 0);
-    deviceContext->PSSetShader(gTexShader.fragment, 0, 0);
+    deviceContext->VSSetShader(gTex2DShader.vertex, 0, 0);
+    deviceContext->PSSetShader(gTex2DShader.fragment, 0, 0);
 
     // Render the for Views
     for(i32 i = 0; i < 4; ++i)

@@ -139,7 +139,7 @@ static void InitD3D11(HWND window)
 
     for(u32 driver = 0; driver < driverTypesCount; ++driver)
     {
-        result = D3D11CreateDeviceAndSwapChain(0, driverTypes[driver], 0, 0, 
+        result = D3D11CreateDeviceAndSwapChain(0, driverTypes[driver], 0, D3D11_CREATE_DEVICE_DEBUG, 
                                                featureLevels, featureLevelsCount,
                                                D3D11_SDK_VERSION,
                                                &swapChainDesc, &swapChain,
@@ -267,11 +267,11 @@ static void InitD3D11(HWND window)
 
     // Create Sampler State
     D3D11_SAMPLER_DESC colorMapDesc = {};
-    colorMapDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP; //D3D11_TEXTURE_ADDRESS_WRAP;
-    colorMapDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP; //D3D11_TEXTURE_ADDRESS_WRAP;
-    colorMapDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP; //D3D11_TEXTURE_ADDRESS_WRAP;
+    colorMapDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP; // D3D11_TEXTURE_ADDRESS_CLAMP;
+    colorMapDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP; // D3D11_TEXTURE_ADDRESS_CLAMP;
+    colorMapDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP; // D3D11_TEXTURE_ADDRESS_CLAMP;
     colorMapDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-    colorMapDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT; //D3D11_FILTER_MIN_MAG_MIP_LINEAR | D3D11_FILTER_MIN_MAG_MIP_POINT
+    colorMapDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR; //D3D11_FILTER_MIN_MAG_MIP_LINEAR | D3D11_FILTER_MIN_MAG_MIP_POINT
     colorMapDesc.MaxLOD = D3D11_FLOAT32_MAX;
     if(FAILED(device->CreateSamplerState(&colorMapDesc, &gSamplerState)))
     {
@@ -282,7 +282,7 @@ static void InitD3D11(HWND window)
     deviceContext->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
     deviceContext->OMSetDepthStencilState(depthStencilOn, 1);
     deviceContext->OMSetBlendState(alphaBlendEnable, 0, 0xffffffff);
-    deviceContext->RSSetState(fillRasterizerCullNone);
+    deviceContext->RSSetState(fillRasterizerCullBack);
     deviceContext->PSSetSamplers(0, 1, &gSamplerState);
 }
 
@@ -605,6 +605,11 @@ void UnloadDynamicVertexBuffer(DynamicVertexBuffer *vertexBuffer)
 
 FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT format)
 {
+    i32 msaa = 4;
+    UINT msaaQuality4x;
+    device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaa, &msaaQuality4x);
+    ASSERT(msaaQuality4x > 0);
+
     FrameBuffer frameBuffer = {};
     frameBuffer.x = x;
     frameBuffer.y = y;
@@ -619,8 +624,8 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     texDesc.MipLevels = 1;
     texDesc.ArraySize = 1;
     texDesc.Format = format;
-    texDesc.SampleDesc.Count = 1;
-    texDesc.SampleDesc.Quality = 0;
+    texDesc.SampleDesc.Count = msaa;
+    texDesc.SampleDesc.Quality = msaaQuality4x - 1;
     texDesc.Usage = D3D11_USAGE_DEFAULT;
     texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
     texDesc.CPUAccessFlags = 0;
@@ -634,7 +639,7 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     // create render target view
     D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
     rtvDesc.Format = format;
-    rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+    rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DMS ;
     rtvDesc.Texture2D.MipSlice = 0;
     if(FAILED(device->CreateRenderTargetView(frameBuffer.texture, &rtvDesc, &frameBuffer.renderTargetView)))
     {
@@ -645,7 +650,7 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     // create shader resource view
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = format;
-    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMS;
     srvDesc.Texture2D.MipLevels = texDesc.MipLevels;
     srvDesc.Texture2D.MostDetailedMip = 0;
     if (FAILED(device->CreateShaderResourceView(frameBuffer.texture, &srvDesc, &frameBuffer.shaderResourceView)))
@@ -662,8 +667,8 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     depthStencilTextureDesc.MipLevels = 1;
     depthStencilTextureDesc.ArraySize = 1;
     depthStencilTextureDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    depthStencilTextureDesc.SampleDesc.Count = 1;
-    depthStencilTextureDesc.SampleDesc.Quality = 0;
+    depthStencilTextureDesc.SampleDesc.Count = msaa;
+    depthStencilTextureDesc.SampleDesc.Quality = msaaQuality4x - 1;
     depthStencilTextureDesc.Usage = D3D11_USAGE_DEFAULT;
     depthStencilTextureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     depthStencilTextureDesc.CPUAccessFlags = 0;
@@ -677,7 +682,7 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     }
     D3D11_DEPTH_STENCIL_VIEW_DESC descDSV = {};
     descDSV.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
     descDSV.Texture2D.MipSlice = 0;
 
     if(FAILED(device->CreateDepthStencilView(depthStencilTexture, &descDSV, &frameBuffer.depthStencilView)))
@@ -713,15 +718,15 @@ void LoadTextureAtlasGpuData(TextureAtlas *atlas)
     D3D11_TEXTURE2D_DESC texDesc;
     texDesc.Width = atlas->w;
     texDesc.Height = atlas->h;
-    texDesc.MipLevels = 1;
+    texDesc.MipLevels = 0;
     texDesc.ArraySize = 1;
     texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     texDesc.SampleDesc.Count = 1;
     texDesc.SampleDesc.Quality = 0;
-    texDesc.Usage = D3D11_USAGE_DYNAMIC;
-    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    texDesc.MiscFlags = 0;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+    texDesc.CPUAccessFlags = 0;//D3D11_CPU_ACCESS_WRITE;
+    texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
     if(FAILED(device->CreateTexture2D(&texDesc, 0, &atlas->gpuPixels)))
     {
         printf("Error creating Texture Atlas GPU Texture\n");
@@ -732,13 +737,20 @@ void LoadTextureAtlasGpuData(TextureAtlas *atlas)
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = texDesc.MipLevels;
+    srvDesc.Texture2D.MipLevels = -1;
     srvDesc.Texture2D.MostDetailedMip = 0;
     if (FAILED(device->CreateShaderResourceView(atlas->gpuPixels, &srvDesc, &atlas->srv)))
     {
         printf("Error creating Atlas srv\n");
         ASSERT(!"INVALID_CODE_PATH");
     }
+
+    D3D11_SUBRESOURCE_DATA data = {};
+    data.pSysMem = atlas->cpuPixels;
+    data.SysMemPitch  = atlas->w*sizeof(u32);
+    data.SysMemSlicePitch = 0;
+    deviceContext->UpdateSubresource(atlas->gpuPixels, 0, 0, data.pSysMem, data.SysMemPitch, 0);
+    deviceContext->GenerateMips(atlas->srv);
 }
 
 void UnloadTextureAtlasGpuData(TextureAtlas *atlas)
@@ -922,21 +934,26 @@ void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
     free(atlas->cpuPixels);
     atlas->cpuPixels = tmpPixels;
 
-    // chack if the atlas change size
-    if(atlas->w != oldAtlasW || atlas->h != oldAtlasH)
-    {
-        // if change size reacreate the GPU pixels 
-        UnloadTextureAtlasGpuData(atlas);
-        LoadTextureAtlasGpuData(atlas);
-        printf("Texture Atlas Reallocated!!!\n");
-    }
+    UnloadTextureAtlasGpuData(atlas);
+    LoadTextureAtlasGpuData(atlas);
 
+    // chack if the atlas change size
+    //if(atlas->w != oldAtlasW || atlas->h != oldAtlasH)
+    //{
+    //    // if change size reacreate the GPU pixels 
+    //    UnloadTextureAtlasGpuData(atlas);
+    //    LoadTextureAtlasGpuData(atlas);
+    //    printf("Texture Atlas Reallocated!!!\n");
+    //}
+
+    /*
     // copy the pixels from the cpu to the gpu
     D3D11_MAPPED_SUBRESOURCE bufferData;
     ZeroMemory(&bufferData, sizeof(bufferData));
     deviceContext->Map(atlas->gpuPixels, 0, D3D11_MAP_WRITE_DISCARD, 0, &bufferData);
     memcpy(bufferData.pData, atlas->cpuPixels, sizeof(u32)*atlas->w*atlas->h);
     deviceContext->Unmap(atlas->gpuPixels, 0);
+    */
 
     for(i32 i = 0; i < DarraySize(atlas->textures); ++i)
     {

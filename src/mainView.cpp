@@ -20,8 +20,9 @@ void ProcessMainView(View *view)
 
 void RenderMainView(View *view)
 {
-    deviceContext->VSSetShader(gColShader.vertex, 0, 0);
-    deviceContext->PSSetShader(gColShader.fragment, 0, 0);
+    deviceContext->PSSetShaderResources(0, 1, &gAtlas.srv);
+    deviceContext->VSSetShader(gTexShader.vertex, 0, 0);
+    deviceContext->PSSetShader(gTexShader.fragment, 0, 0);
 
     u32 stride = sizeof(Vertex);
     u32 offset = 0;

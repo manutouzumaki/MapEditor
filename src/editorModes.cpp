@@ -90,7 +90,7 @@ void EditorModeMove3DCamera(View *view)
     state->camera.up =  Vec3Normalized(Vec3Cross(state->camera.right, state->camera.dir));
 
     view->cbuffer.view = Mat4LookAt(state->camera.pos, state->camera.pos + state->camera.dir, {0, 1, 0});
-    view->cbuffer.viewDir = state->camera.dir;
+    view->cbuffer.viewDir = state->camera.pos;
 }
 
 void EditorModeAddPoly(View *view)

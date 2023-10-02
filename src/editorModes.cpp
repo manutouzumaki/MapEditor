@@ -7,8 +7,6 @@ void EditorModeMove3DCamera(View *view)
 
     ViewPerspState *state = &view->perspState;
 
-    printf("CameraP x: %f y: %f z: %f\n", state->camera.pos.x, state->camera.pos.y, state->camera.pos.z);
-
     if(MouseIsHot(view))
     {
         if(MouseJustDown(MOUSE_BUTTON_LEFT))
@@ -203,6 +201,11 @@ bool MouseInControlPoint(View *view, Vec2 rect)
         return true;
     }
     return false;
+}
+
+void EditorModeAddPoly3D(View *view)
+{
+
 }
 
 void EditorModeModifyPoly(View *view)
@@ -533,7 +536,6 @@ i32 MousePicking3D(View *view)
         f32 t = -1.0f;
         if(RayHitPolyPlane(ray, poly, &t))
         {
-            printf("%d: %f\n", i, t);
             if(t < tMin)
             {
                 tMin = t;

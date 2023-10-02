@@ -12,6 +12,9 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 #include "defines.h"
 #include "darray.h"
 #include "math.h"
@@ -39,6 +42,7 @@ static Shader gTexShader;
 static ConstBuffer gConstBuffer;
 static VertexBuffer gVertexBuffer;
 static DynamicVertexBuffer gDynamicVertexBuffer;
+static TextureAtlas gAtlas;
 static Vertex gQuad[] = {
     // Face 1
     {{-0.5f, -0.5f, 0}, {0, 0, 1}, {0.8, 0.8, 0.8, 1}, {0, 1}},
@@ -57,6 +61,7 @@ enum EditorMode
     EDITOR_MODE_ADD_POLY,
     EDITOR_MODE_MODIFY_POLY,
     EDITOR_MODE_MOVE_3D_CAMERA,
+    EDITOR_MODE_SET_TEXTURE,
 
     EDITOR_MODE_COUNT
 };
@@ -78,6 +83,7 @@ enum ControlPoint
 // TODO: see what to do with this ones
 static EditorMode gCurrentEditorMode;
 static SharedMemory gSharedMemory;
+static Texture *gCurrentTexture;
 
 #include "darray.cpp"
 #include "input.cpp"
@@ -172,6 +178,15 @@ int main()
     cbuffer.viewDir = {};
     gConstBuffer = LoadConstBuffer((void *)&cbuffer, sizeof(CBuffer), 0);
 
+    gAtlas = LoadTextureAtlas(256*2, 256);
+
+    AddTextureToTextureAtlas(&gAtlas, "../assets/brick.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/wood.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/cool.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/grass.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/noTexture.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/short.png");
+
     ShowWindow(window, SW_MAXIMIZE);
 
     gRunning = true;
@@ -188,15 +203,29 @@ int main()
         // Render View To Main Back Buffer
         ViewManagerRenderViews(&vm, &cbuffer, clientRect);
 
+        // TODO: render texture atlas to test if work correctly
+        
         // Render GUI
         RenderImGui();
         PresentImGui();
+
+        // DRAW TEXTURE ATLAS ON TOP OF THE APPLICATION ONLY FOR DEBUG
+#if 0
+        deviceContext->PSSetShaderResources(0, 1, &gAtlas.srv);
+        cbuffer.world = Mat4Translate(gCurrentWindowWidth*0.5f,
+                                      gCurrentWindowHeight*0.5f,
+                                      -4) * Mat4Scale(gAtlas.w, gAtlas.h, 1);
+        UpdateConstBuffer(&gConstBuffer, (void *)&cbuffer);
+        deviceContext->Draw(gVertexBuffer.verticesCount, 0);
+#endif
         
         // Swap main Buffer
         swapChain->Present(1, 0);
 
         gLastInput = gInput;
     }
+
+    UnloadTextureAtlas(&gAtlas);
 
     ShutDownImGui();
 

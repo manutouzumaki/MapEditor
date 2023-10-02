@@ -43,6 +43,28 @@ struct DynamicVertexBuffer
     size_t used;
 };
 
+struct Texture
+{
+    u32 *pixels;
+    i32 x, y;
+    i32 w, h;
+    i32 pich;
+
+    bool lastAdded;
+};
+
+struct TextureAtlas
+{
+    i32 w, h;
+    
+    u32 *cpuPixels;
+    ID3D11Texture2D *gpuPixels;
+    ID3D11ShaderResourceView *srv;
+
+    // a Darray to handle the textures inside the atlas
+    Texture *textures;
+};
+
 struct FrameBuffer
 {
     // TODO: MOVE the x ,y,w and h to view structure

@@ -706,3 +706,242 @@ void ResizeFrameBuffer(FrameBuffer *frameBuffer, f32 x, f32 y, f32 width, f32 he
     UnloadFrameBuffer(frameBuffer);
     *frameBuffer = LoadFrameBuffer(x, y, width, height, frameBuffer->format);
 }
+
+void LoadTextureAtlasGpuData(TextureAtlas *atlas)
+{
+    // Create the GPU stuff
+    D3D11_TEXTURE2D_DESC texDesc;
+    texDesc.Width = atlas->w;
+    texDesc.Height = atlas->h;
+    texDesc.MipLevels = 1;
+    texDesc.ArraySize = 1;
+    texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.SampleDesc.Quality = 0;
+    texDesc.Usage = D3D11_USAGE_DYNAMIC;
+    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    texDesc.MiscFlags = 0;
+    if(FAILED(device->CreateTexture2D(&texDesc, 0, &atlas->gpuPixels)))
+    {
+        printf("Error creating Texture Atlas GPU Texture\n");
+        ASSERT(!"INVALID_CODE_PATH");
+    }
+
+    // create shader resource view
+    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = texDesc.MipLevels;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+    if (FAILED(device->CreateShaderResourceView(atlas->gpuPixels, &srvDesc, &atlas->srv)))
+    {
+        printf("Error creating Atlas srv\n");
+        ASSERT(!"INVALID_CODE_PATH");
+    }
+}
+
+void UnloadTextureAtlasGpuData(TextureAtlas *atlas)
+{
+    if(atlas->gpuPixels) atlas->gpuPixels->Release(); atlas->gpuPixels = 0;
+    if(atlas->srv) atlas->srv->Release(); atlas->srv = 0;
+}
+
+TextureAtlas LoadTextureAtlas(i32 width, i32 height)
+{
+    TextureAtlas atlas = {};
+
+    // Create the CPU stuff
+    atlas.w = width;
+    atlas.h = height;
+    atlas.textures = 0;
+    atlas.cpuPixels = (u32 *)malloc(sizeof(u32)*width*height);
+
+    LoadTextureAtlasGpuData(&atlas);
+
+    return atlas;
+}
+
+void UnloadTextureAtlas(TextureAtlas *atlas)
+{
+    if(atlas->cpuPixels) free(atlas->cpuPixels);
+    UnloadTextureAtlasGpuData(atlas);
+
+}
+
+void SortTextureByHeightInTextuerAtlas(TextureAtlas *atlas)
+{
+    bool swapped;
+    for(i32 i = 0; i < DarraySize(atlas->textures) - 1; ++i)
+    {
+        swapped = false;
+        for(i32 j = 0; j < DarraySize(atlas->textures) - i - 1; ++j)
+        {
+            Texture a = atlas->textures[j + 0];
+            Texture b = atlas->textures[j + 1];
+            if(a.h < b.h)
+            {
+                Texture tmp = a;
+                a = b;
+                b = tmp;
+                swapped = true;
+            }
+        }
+
+        if(swapped == false)
+            break;
+    }
+}
+
+void CopyTextureToAtlas(u32 *dst, i32 xDst, i32 yDst, i32 pDst,
+                        u32 *src, i32 xSrc, i32 ySrc, i32 pSrc, i32 wSrc, i32 hSrc)
+{
+    for(i32 y = 0; y < hSrc; ++y)
+    {
+        for(i32 x = 0; x < wSrc; ++x)
+        {
+            dst[(yDst + y) * pDst + (xDst + x)] = src[(ySrc + y) * pSrc + (xSrc + x)];
+        }
+    }
+}
+
+void CopyTextureToAtlas(u32 *dst, i32 xDst, i32 yDst, i32 pDst,
+                        u32 *src, i32 pSrc, i32 wSrc, i32 hSrc)
+{
+    for(i32 y = 0; y < hSrc; ++y)
+    {
+        for(i32 x = 0; x < wSrc; ++x)
+        {
+            dst[(yDst + y) * pDst + (xDst + x)] = src[y * pSrc + x];
+        }
+    }
+}
+
+void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
+{
+    stbi_set_flip_vertically_on_load(false);
+    // fisrt load the new texture to be added to the atlas
+    i32 width, height, nrComponents;
+    u8 *pixels = stbi_load(filepath, &width, &height, &nrComponents, 0);
+
+    if(pixels == 0)
+    {
+        printf("Error loading texture: %s\n", filepath);
+        ASSERT(!"INVALID_CODE_PATH");
+    }
+
+    Texture newTexture = {};
+    newTexture.x = -1;
+    newTexture.y = -1;
+    newTexture.w = width;
+    newTexture.h = height;
+    newTexture.pich = width;
+    newTexture.pixels = (u32 *)pixels;
+    newTexture.lastAdded = true;
+   
+    DarrayPush(atlas->textures, newTexture, Texture);
+
+    SortTextureByHeightInTextuerAtlas(atlas);
+
+
+    // update texture atlas
+    // create a copy of the old pixel we need to save the pixels value to copy them
+    u32 *tmpPixels = (u32 *)malloc(sizeof(u32)*atlas->w*atlas->h);
+    memset(tmpPixels, 0, sizeof(u32)*atlas->w*atlas->h);
+    //memcpy(tmpPixels, atlas->cpuPixels, sizeof(u32)*atlas->w*atlas->h);
+
+    i32 oldAtlasW = atlas->w;
+    i32 oldAtlasH = atlas->h;
+
+    // for each texture in the atlas we copy it to the new position
+    // after the sort
+    i32 xPos = 0; // start at one because of the offset
+    i32 yPos = 0;
+    i32 yOffset = atlas->textures[0].h;
+    for(i32 i = 0; i < DarraySize(atlas->textures); ++i)
+    {
+        Texture *texture = atlas->textures + i;
+        i32 xOffset = texture->w;
+
+        if(xPos + xOffset <= atlas->w)
+        {
+            if(texture->lastAdded)
+                CopyTextureToAtlas(tmpPixels, xPos, yPos, atlas->w, 
+                                   (u32 *)pixels, texture->pich, texture->w, texture->h); 
+            else
+                CopyTextureToAtlas(tmpPixels, xPos, yPos, atlas->w,
+                                   atlas->cpuPixels, texture->x, texture->y, texture->pich, texture->w, texture->h); 
+
+            texture->x = xPos;
+            texture->y = yPos;
+            texture->pich = atlas->w;
+            texture->pixels = tmpPixels + yPos * atlas->w + xPos;
+
+            xPos += xOffset;
+        }
+        else
+        {
+            xPos = 0;
+            yPos += yOffset;
+            yOffset = texture->h;
+
+            if(yPos + texture->h <= atlas->h)
+            {
+                if(texture->lastAdded)
+                    CopyTextureToAtlas(tmpPixels, xPos, yPos, atlas->w, 
+                                       (u32 *)pixels, texture->pich, texture->w, texture->h); 
+                else
+                    CopyTextureToAtlas(tmpPixels, xPos, yPos, atlas->w,
+                                       atlas->cpuPixels, texture->x, texture->y, texture->pich, texture->w, texture->h); 
+
+                texture->x = xPos;
+                texture->y = yPos;
+                texture->pich = atlas->w;
+                texture->pixels = tmpPixels + yPos * atlas->w + xPos;
+
+                xPos += xOffset;
+            }
+            else
+            {
+                // resize the buffer
+                tmpPixels = (u32 *)realloc(tmpPixels, sizeof(u32)*(atlas->w*2)*(atlas->h)*2);
+                memset(tmpPixels, 0, sizeof(u32)*(atlas->w*2)*(atlas->h)*2);
+                // restart the copy
+                xPos = 0;
+                yPos = 0;
+                yOffset = atlas->textures[0].h;
+                i =  -1;
+                atlas->w = atlas->w*2;
+                atlas->h = atlas->h*2;
+
+            }
+        }  
+    }
+
+    stbi_image_free(pixels);
+    free(atlas->cpuPixels);
+    atlas->cpuPixels = tmpPixels;
+
+    // chack if the atlas change size
+    if(atlas->w != oldAtlasW || atlas->h != oldAtlasH)
+    {
+        // if change size reacreate the GPU pixels 
+        UnloadTextureAtlasGpuData(atlas);
+        LoadTextureAtlasGpuData(atlas);
+        printf("Texture Atlas Reallocated!!!\n");
+    }
+
+    // copy the pixels from the cpu to the gpu
+    D3D11_MAPPED_SUBRESOURCE bufferData;
+    ZeroMemory(&bufferData, sizeof(bufferData));
+    deviceContext->Map(atlas->gpuPixels, 0, D3D11_MAP_WRITE_DISCARD, 0, &bufferData);
+    memcpy(bufferData.pData, atlas->cpuPixels, sizeof(u32)*atlas->w*atlas->h);
+    deviceContext->Unmap(atlas->gpuPixels, 0);
+
+    for(i32 i = 0; i < DarraySize(atlas->textures); ++i)
+    {
+        Texture *texture = atlas->textures + i;
+        texture->lastAdded = false;
+    }
+}
+

@@ -32,11 +32,6 @@ void *DarrayCreate_(void *array, u32 elementSize, u32 elementCount) {
     }
 }
 
-void DarrayModifySize(void *array, u32 size) {
-    u32 *base = DARRAY_RAW_DATA(array);
-    base[1] = size;
-}
-
 void DarrayDestroy_(void *array) {
     ASSERT(array != NULL);
     void *rawData = DARRAY_RAW_DATA(array);

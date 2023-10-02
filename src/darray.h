@@ -17,6 +17,4 @@ u32 DarraySize_(void *array);
 u32 DarrayCapacity_(void *array);
 
 
-void DarrayModifySize(void *array, u32 size);
-
 #endif

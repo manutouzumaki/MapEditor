@@ -16,7 +16,7 @@ struct VS_Input
 struct PS_Input
 {
     float4 pos : SV_POSITION;
-    float4 col : TEXCOORD0;
+    float4 col : COLOR;
 };
 
 PS_Input vs_main(VS_Input vertex)

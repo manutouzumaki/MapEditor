@@ -16,6 +16,7 @@ void ProcessMainView(View *view)
 {
     EditorModeMove3DCamera(view);
     EditorModeSelectPoly(view);
+    EditorModeSetTexture(view);
 }
 
 void RenderMainView(View *view)

@@ -12,22 +12,33 @@ struct FragmentIn
 
 float4 fs_main(FragmentIn i) : SV_TARGET
 {
-    float3 color = srv.Sample(samplerState, i.uv).rgb;
+    float3 viewPos = i.viewDir;
+    
+    float u = i.uv.x;
+    //u = u * 2.0f;
+    //u = fmod(u, 0.5f);
+
+    float v = i.uv.y;
+
+    float2 uv = float2(u, v);
+
+    float3 color = srv.Sample(samplerState, uv).rgb;
     float3 lightColor = float3(1.0f, 1.0f, 1.0f);
     float3 lightPos = float3(0, 20, 40);
-    float3 lightDir = normalize(lightPos - i.fragPos);
 
     float ambientStrength = 0.2f;
     float3 ambient = mul(lightColor, ambientStrength);
     // diffuse
-    float diffuseStrength = max(dot(i.nor, lightDir), 0.0f);
-    float3 diffuse = mul(lightColor, diffuseStrength);
+    float3 norm = normalize(i.nor);
+    float3 lightDir = normalize(lightPos - i.fragPos);
+    float diffuseStrength = max(dot(norm, lightDir), 0.0f);
+    float3 diffuse = mul(diffuseStrength, lightColor);
     // specular
-    float specularStrength = 1.0f;
-    float3 viewDir = normalize(i.fragPos - i.viewDir);
-    float3 reflectDir = reflect(-lightDir, i.nor);
+    float specularStrength = 0.5f;
+    float3 viewDir = normalize(viewPos - i.fragPos);
+    float3 reflectDir = reflect(-lightDir, norm);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0f), 32.0f); 
-    float3 specular = mul(spec * lightColor, specularStrength);
+    float3 specular = mul(lightColor * spec, specularStrength);
 
     float3 result = (ambient + diffuse + specular) * color;
 

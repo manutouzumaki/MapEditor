@@ -126,8 +126,8 @@ void ProcessWindowResize(ViewManager *vm, CBuffer *cbuffer, f32 &clientWidth, Re
 }
 
 
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-//int main()
+// int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+int main()
 {
     HINSTANCE instace = GetModuleHandle(0);
     HWND window = InitWindow(instace);
@@ -185,11 +185,13 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
     gAtlas = LoadTextureAtlas(256, 256);
 
-    //AddTextureToTextureAtlas(&gAtlas, "../assets/grass.png");
-    //AddTextureToTextureAtlas(&gAtlas, "../assets/brick.png");
-    //AddTextureToTextureAtlas(&gAtlas, "../assets/wood.png");
-    //AddTextureToTextureAtlas(&gAtlas, "../assets/cool.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/noTexture.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/grass.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/brick.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/wood.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/cool.png");
+
+    gCurrentTexture = gAtlas.textures;
+    //AddTextureToTextureAtlas(&gAtlas, "../assets/noTexture.png");
     //AddTextureToTextureAtlas(&gAtlas, "../assets/short.png");
 
     ShowWindow(window, SW_MAXIMIZE);
@@ -238,6 +240,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     UnloadDynamicVertexBuffer(&gDynamicVertexBuffer);
     UnloadShader(&gColShader);
     UnloadShader(&gCol2DShader);
+    UnloadShader(&gTexShader);
     UnloadShader(&gTex2DShader);
     UnloadConstBuffer(&gConstBuffer);
     

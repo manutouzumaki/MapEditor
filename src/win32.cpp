@@ -15,6 +15,8 @@ static ID3D11BlendState* alphaBlendDisable;
 
 static ID3D11SamplerState *gSamplerState;
 
+static i32 gMsaa = 4;
+
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -99,58 +101,43 @@ static HWND InitWindow(HINSTANCE instace)
 
 static void InitD3D11(HWND window)
 {
-    // Init directx 11
-    D3D_DRIVER_TYPE driverTypes[] =
-    {
-        D3D_DRIVER_TYPE_HARDWARE,
-        D3D_DRIVER_TYPE_WARP,
-        D3D_DRIVER_TYPE_SOFTWARE
-    };
-    i32 driverTypesCount = ARRAY_LENGTH(driverTypes);
+    i32 deviceFlags = 0; //D3D11_CREATE_DEVICE_DEBUG;
 
-    D3D_FEATURE_LEVEL featureLevels[] = 
-    {
-        D3D_FEATURE_LEVEL_11_0,
-        D3D_FEATURE_LEVEL_10_1,
-        D3D_FEATURE_LEVEL_10_0,
-    };
-    i32 featureLevelsCount = ARRAY_LENGTH(featureLevels);
+    D3D_FEATURE_LEVEL featureLevel;
+    HRESULT result = D3D11CreateDevice(0, D3D_DRIVER_TYPE_HARDWARE, 0, deviceFlags, 0, 0, D3D11_SDK_VERSION, &device, &featureLevel, &deviceContext);
+
+    UINT msaaQuality4x;
+    device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, gMsaa, &msaaQuality4x);
+    ASSERT(msaaQuality4x > 0);
 
     // create the d3d11 device swapchain and device context
     DXGI_SWAP_CHAIN_DESC swapChainDesc;
-    memset(&swapChainDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
-    swapChainDesc.BufferCount = 1;
     swapChainDesc.BufferDesc.Width = WINDOW_WIDTH;
     swapChainDesc.BufferDesc.Height = WINDOW_HEIGHT;
-    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     swapChainDesc.BufferDesc.RefreshRate.Numerator = 60;
     swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
-    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+    swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+    swapChainDesc.SampleDesc.Count = gMsaa;
+    swapChainDesc.SampleDesc.Quality = msaaQuality4x - 1;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    swapChainDesc.BufferCount = 1;
     swapChainDesc.OutputWindow = window;
-    swapChainDesc.Windowed = TRUE;
-    swapChainDesc.SampleDesc.Count = 1;
-    swapChainDesc.SampleDesc.Quality = 0;
+    swapChainDesc.Windowed = true;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+    swapChainDesc.Flags = 0;
 
-    D3D_DRIVER_TYPE driverType;
-    D3D_FEATURE_LEVEL featureLevel;
-    HRESULT result = 0;
-
-    for(u32 driver = 0; driver < driverTypesCount; ++driver)
-    {
-        result = D3D11CreateDeviceAndSwapChain(0, driverTypes[driver], 0, D3D11_CREATE_DEVICE_DEBUG, 
-                                               featureLevels, featureLevelsCount,
-                                               D3D11_SDK_VERSION,
-                                               &swapChainDesc, &swapChain,
-                                               &device, &featureLevel,
-                                               &deviceContext);
-        if(SUCCEEDED(result))
-        {
-            driverType = driverTypes[driver];
-            break;
-        }
-    }
+    IDXGIDevice* dxgiDevice = 0;
+    device->QueryInterface(__uuidof(IDXGIDevice), (void**)&dxgiDevice);
+    IDXGIAdapter* dxgiAdapter = 0;
+    dxgiDevice->GetParent(__uuidof(IDXGIAdapter), (void**)&dxgiAdapter);
+    IDXGIFactory* dxgiFactory = 0;
+    dxgiAdapter->GetParent(__uuidof(IDXGIFactory), (void**)&dxgiFactory);
+    dxgiFactory->CreateSwapChain(device, &swapChainDesc, &swapChain);
+    if(dxgiDevice) dxgiDevice->Release();
+    if(dxgiAdapter) dxgiAdapter->Release();
+    if(dxgiFactory) dxgiFactory->Release();
     
     // create render target view
     ID3D11Texture2D *backBufferTexture = 0;
@@ -179,21 +166,15 @@ static void InitD3D11(HWND window)
     depthStencilTextureDesc.MipLevels = 1;
     depthStencilTextureDesc.ArraySize = 1;
     depthStencilTextureDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    depthStencilTextureDesc.SampleDesc.Count = 1;
-    depthStencilTextureDesc.SampleDesc.Quality = 0;
+    depthStencilTextureDesc.SampleDesc.Count = gMsaa;
+    depthStencilTextureDesc.SampleDesc.Quality = msaaQuality4x - 1;
     depthStencilTextureDesc.Usage = D3D11_USAGE_DEFAULT;
     depthStencilTextureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     depthStencilTextureDesc.CPUAccessFlags = 0;
     depthStencilTextureDesc.MiscFlags = 0;
+    result = device->CreateTexture2D(&depthStencilTextureDesc, 0, &depthStencilTexture);
  
-    // create the depth stencil view
-    result = device->CreateTexture2D(&depthStencilTextureDesc, NULL, &depthStencilTexture);
-    D3D11_DEPTH_STENCIL_VIEW_DESC descDSV = {};
-    descDSV.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-    descDSV.Texture2D.MipSlice = 0;
-
-    result = device->CreateDepthStencilView(depthStencilTexture, &descDSV, &depthStencilView);
+    result = device->CreateDepthStencilView(depthStencilTexture, 0, &depthStencilView);
     if (depthStencilTexture)
     {
         depthStencilTexture->Release();
@@ -245,31 +226,40 @@ static void InitD3D11(HWND window)
     fillRasterizerFrontDesc.FillMode = D3D11_FILL_SOLID;
     fillRasterizerFrontDesc.CullMode = D3D11_CULL_FRONT;
     fillRasterizerFrontDesc.DepthClipEnable = true;
+    fillRasterizerFrontDesc.AntialiasedLineEnable = true;
+    fillRasterizerFrontDesc.MultisampleEnable = true;
     device->CreateRasterizerState(&fillRasterizerFrontDesc, &fillRasterizerCullFront);
 
     D3D11_RASTERIZER_DESC fillRasterizerBackDesc = {};
     fillRasterizerBackDesc.FillMode = D3D11_FILL_SOLID;
     fillRasterizerBackDesc.CullMode = D3D11_CULL_BACK;
     fillRasterizerBackDesc.DepthClipEnable = true;
+    fillRasterizerBackDesc.AntialiasedLineEnable = true;
+    fillRasterizerBackDesc.MultisampleEnable = true;
     device->CreateRasterizerState(&fillRasterizerBackDesc, &fillRasterizerCullBack);
 
     D3D11_RASTERIZER_DESC fillRasterizerNoneDesc = {};
     fillRasterizerNoneDesc.FillMode = D3D11_FILL_SOLID;
     fillRasterizerNoneDesc.CullMode = D3D11_CULL_NONE;
     fillRasterizerNoneDesc.DepthClipEnable = true;
+    fillRasterizerNoneDesc.AntialiasedLineEnable = true;
+    fillRasterizerNoneDesc.MultisampleEnable = true;
     device->CreateRasterizerState(&fillRasterizerNoneDesc, &fillRasterizerCullNone);
 
     D3D11_RASTERIZER_DESC wireFrameRasterizerDesc = {};
     wireFrameRasterizerDesc.FillMode = D3D11_FILL_WIREFRAME;
     wireFrameRasterizerDesc.CullMode = D3D11_CULL_NONE;
     wireFrameRasterizerDesc.DepthClipEnable = true;
+    wireFrameRasterizerDesc.AntialiasedLineEnable = true;
+    wireFrameRasterizerDesc.MultisampleEnable = true;
     device->CreateRasterizerState(&wireFrameRasterizerDesc, &wireFrameRasterizer);
 
     // Create Sampler State
     D3D11_SAMPLER_DESC colorMapDesc = {};
-    colorMapDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP; // D3D11_TEXTURE_ADDRESS_CLAMP;
-    colorMapDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP; // D3D11_TEXTURE_ADDRESS_CLAMP;
-    colorMapDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP; // D3D11_TEXTURE_ADDRESS_CLAMP;
+    // D3D11_TEXTURE_ADDRESS_CLAMP; D3D11_TEXTURE_ADDRESS_WRAP;
+    colorMapDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP; 
+    colorMapDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP; 
+    colorMapDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP; 
     colorMapDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
     colorMapDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR; //D3D11_FILTER_MIN_MAG_MIP_LINEAR | D3D11_FILTER_MIN_MAG_MIP_POINT
     colorMapDesc.MaxLOD = D3D11_FLOAT32_MAX;
@@ -342,10 +332,14 @@ static void FlushEvents(HWND window)
 
 static void ResizeD3D11()
 {
+    UINT msaaQuality4x;
+    device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, gMsaa, &msaaQuality4x);
+    ASSERT(msaaQuality4x > 0);
+
     if(renderTargetView) renderTargetView->Release(); renderTargetView = 0;
     if(depthStencilView) depthStencilView->Release(); depthStencilView = 0;
     
-    swapChain->ResizeBuffers(0, gResizeWidth, gResizeHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+    swapChain->ResizeBuffers(1, gResizeWidth, gResizeHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
     
     // re create render target view
     ID3D11Texture2D *backBufferTexture = 0;
@@ -363,21 +357,15 @@ static void ResizeD3D11()
     depthStencilTextureDesc.MipLevels = 1;
     depthStencilTextureDesc.ArraySize = 1;
     depthStencilTextureDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    depthStencilTextureDesc.SampleDesc.Count = 1;
-    depthStencilTextureDesc.SampleDesc.Quality = 0;
+    depthStencilTextureDesc.SampleDesc.Count = gMsaa;
+    depthStencilTextureDesc.SampleDesc.Quality = msaaQuality4x - 1;
     depthStencilTextureDesc.Usage = D3D11_USAGE_DEFAULT;
     depthStencilTextureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     depthStencilTextureDesc.CPUAccessFlags = 0;
     depthStencilTextureDesc.MiscFlags = 0;
+    device->CreateTexture2D(&depthStencilTextureDesc, 0, &depthStencilTexture);
  
-    // create the depth stencil view
-    device->CreateTexture2D(&depthStencilTextureDesc, NULL, &depthStencilTexture);
-    D3D11_DEPTH_STENCIL_VIEW_DESC descDSV = {};
-    descDSV.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-    descDSV.Texture2D.MipSlice = 0;
-
-    device->CreateDepthStencilView(depthStencilTexture, &descDSV, &depthStencilView);
+    device->CreateDepthStencilView(depthStencilTexture, 0, &depthStencilView);
     if (depthStencilTexture)
     {
         depthStencilTexture->Release();
@@ -605,11 +593,6 @@ void UnloadDynamicVertexBuffer(DynamicVertexBuffer *vertexBuffer)
 
 FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT format)
 {
-    i32 msaa = 4;
-    UINT msaaQuality4x;
-    device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, msaa, &msaaQuality4x);
-    ASSERT(msaaQuality4x > 0);
-
     FrameBuffer frameBuffer = {};
     frameBuffer.x = x;
     frameBuffer.y = y;
@@ -624,8 +607,8 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     texDesc.MipLevels = 1;
     texDesc.ArraySize = 1;
     texDesc.Format = format;
-    texDesc.SampleDesc.Count = msaa;
-    texDesc.SampleDesc.Quality = msaaQuality4x - 1;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.SampleDesc.Quality = 0;
     texDesc.Usage = D3D11_USAGE_DEFAULT;
     texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
     texDesc.CPUAccessFlags = 0;
@@ -639,7 +622,7 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     // create render target view
     D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
     rtvDesc.Format = format;
-    rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DMS ;
+    rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D ;
     rtvDesc.Texture2D.MipSlice = 0;
     if(FAILED(device->CreateRenderTargetView(frameBuffer.texture, &rtvDesc, &frameBuffer.renderTargetView)))
     {
@@ -650,7 +633,7 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     // create shader resource view
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = format;
-    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMS;
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = texDesc.MipLevels;
     srvDesc.Texture2D.MostDetailedMip = 0;
     if (FAILED(device->CreateShaderResourceView(frameBuffer.texture, &srvDesc, &frameBuffer.shaderResourceView)))
@@ -667,8 +650,8 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     depthStencilTextureDesc.MipLevels = 1;
     depthStencilTextureDesc.ArraySize = 1;
     depthStencilTextureDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    depthStencilTextureDesc.SampleDesc.Count = msaa;
-    depthStencilTextureDesc.SampleDesc.Quality = msaaQuality4x - 1;
+    depthStencilTextureDesc.SampleDesc.Count = 1;
+    depthStencilTextureDesc.SampleDesc.Quality = 0;
     depthStencilTextureDesc.Usage = D3D11_USAGE_DEFAULT;
     depthStencilTextureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     depthStencilTextureDesc.CPUAccessFlags = 0;
@@ -682,7 +665,7 @@ FrameBuffer LoadFrameBuffer(f32 x, f32 y, f32 width, f32 height, DXGI_FORMAT for
     }
     D3D11_DEPTH_STENCIL_VIEW_DESC descDSV = {};
     descDSV.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
+    descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
     descDSV.Texture2D.MipSlice = 0;
 
     if(FAILED(device->CreateDepthStencilView(depthStencilTexture, &descDSV, &frameBuffer.depthStencilView)))
@@ -704,6 +687,7 @@ void UnloadFrameBuffer(FrameBuffer *frameBuffer)
     if(frameBuffer->texture) frameBuffer->texture->Release(); frameBuffer->texture = 0;
     if(frameBuffer->renderTargetView) frameBuffer->renderTargetView->Release(); frameBuffer->renderTargetView = 0;
     if(frameBuffer->shaderResourceView) frameBuffer->shaderResourceView->Release(); frameBuffer->shaderResourceView = 0;
+    if(frameBuffer->depthStencilView) frameBuffer->depthStencilView->Release(); frameBuffer->depthStencilView = 0;
 }
 
 void ResizeFrameBuffer(FrameBuffer *frameBuffer, f32 x, f32 y, f32 width, f32 height)
@@ -860,7 +844,6 @@ void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
     // create a copy of the old pixel we need to save the pixels value to copy them
     u32 *tmpPixels = (u32 *)malloc(sizeof(u32)*atlas->w*atlas->h);
     memset(tmpPixels, 0, sizeof(u32)*atlas->w*atlas->h);
-    //memcpy(tmpPixels, atlas->cpuPixels, sizeof(u32)*atlas->w*atlas->h);
 
     i32 oldAtlasW = atlas->w;
     i32 oldAtlasH = atlas->h;
@@ -936,24 +919,6 @@ void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
 
     UnloadTextureAtlasGpuData(atlas);
     LoadTextureAtlasGpuData(atlas);
-
-    // chack if the atlas change size
-    //if(atlas->w != oldAtlasW || atlas->h != oldAtlasH)
-    //{
-    //    // if change size reacreate the GPU pixels 
-    //    UnloadTextureAtlasGpuData(atlas);
-    //    LoadTextureAtlasGpuData(atlas);
-    //    printf("Texture Atlas Reallocated!!!\n");
-    //}
-
-    /*
-    // copy the pixels from the cpu to the gpu
-    D3D11_MAPPED_SUBRESOURCE bufferData;
-    ZeroMemory(&bufferData, sizeof(bufferData));
-    deviceContext->Map(atlas->gpuPixels, 0, D3D11_MAP_WRITE_DISCARD, 0, &bufferData);
-    memcpy(bufferData.pData, atlas->cpuPixels, sizeof(u32)*atlas->w*atlas->h);
-    deviceContext->Unmap(atlas->gpuPixels, 0);
-    */
 
     for(i32 i = 0; i < DarraySize(atlas->textures); ++i)
     {

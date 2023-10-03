@@ -1,0 +1,13 @@
+{
+"classname" "worldspawn"
+"mapversion" "220"
+"wad" "\games\steamapps\common\half-life\valve\xeno.wad"
+{
+( 0 64 64 ) ( 64 64 64 ) ( 64 0 64 ) AAATRIGGER [ 1 0 0 0 ] [ 0 -1 0 0 ] 0 1 1 
+( 0 0 0 )   ( 64 0 0 )   ( 64 64 0 ) AAATRIGGER [ 1 0 0 0 ] [ 0 -1 0 0 ] 0 1 1 
+( 0 64 64 ) ( 0 0 64 )   ( 0 0 0 )   AAATRIGGER [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1 
+( 64 64 0 ) ( 64 0 0 )   ( 64 0 64 ) AAATRIGGER [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1 
+( 64 64 64 )( 0 64 64 )  ( 0 64 0 )  AAATRIGGER [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1 
+( 64 0 0 )  ( 0 0 0 )    ( 0 0 64 )  AAATRIGGER [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1 
+}
+}

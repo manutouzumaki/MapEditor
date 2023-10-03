@@ -380,8 +380,6 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
                 if(illegal == false)
                 {
                     // TODO: add the vertex
-                    Mat4 scaleMat = Mat4Scale(1.0f/g3DScale, 1.0f/g3DScale, 1.0f/g3DScale);
-                    vertex.position = Mat4TransformPoint(scaleMat, vertex.position);
                     Vertex iVert = vertex; iVert.normal = poly->planes[i].n;// * -1.0f;
                     Vertex jVert = vertex; jVert.normal = poly->planes[j].n;// * -1.0f;
                     Vertex kVert = vertex; kVert.normal = poly->planes[k].n;// * -1.0f;
@@ -393,6 +391,56 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
         }
 
     }}}
+
+    // Set UVs
+    for(i32 i = 0; i < poly->planesCount; ++i)
+    {
+        // for now all our polys have for vertices
+        // so we cant hard code the valus TODO: change this for a more general code
+        TextureAxisNormal texAxis = poly->axisNormals[i];
+        Vec2 texScale = poly->textureScale[i];
+        Vec2 texOffset = poly->textureOffset[i];
+
+        Poly3D *polyD = &polygons[i];
+        Vec3 center = GetCenterOfPolygon(polyD);
+        for(i32 j = 0; j < polyD->verticesCount; ++j)
+        {
+            Vec3 localP = Vec3Normalized(polyD->vertices[j].position - center);
+
+            Vec3 newP = {};
+            if(localP.x != 0) newP.x = localP.x / localP.x;
+            if(localP.y != 0) newP.y = localP.y / localP.y;
+            if(localP.z != 0) newP.z = localP.z / localP.z;
+            if(localP.x < 0) newP.x *= -1.0f;
+            if(localP.y < 0) newP.y *= -1.0f;
+            if(localP.z < 0) newP.z *= -1.0f;
+            localP = newP;
+
+            f32 u, v;
+            u = Vec3Dot(texAxis.u, localP);
+            v = Vec3Dot(texAxis.v, localP);
+            u = Remap(-1.0f, 1.0f, 0.0f, 1.0f, u);
+            v = Remap(-1.0f, 1.0f, 0.0f, 1.0f, v);
+
+            f32 minU = (f32)gCurrentTexture->x / (f32)gAtlas.w;
+            f32 maxU = (f32)(gCurrentTexture->x + gCurrentTexture->w) / (f32)gAtlas.w;
+            f32 minV = (f32)gCurrentTexture->y / (f32)gAtlas.h;
+            f32 maxV = (f32)(gCurrentTexture->y + gCurrentTexture->h) / (f32)gAtlas.w;
+
+            u = Lerp(minU, maxU, u);
+            v = Lerp(minV, maxV, v);
+
+            polyD->vertices[j].uv = {u, v};
+        }
+
+        for(i32 j = 0; j < polyD->verticesCount; ++j)
+        {
+            Vertex vertex = polyD->vertices[j];
+            Mat4 scaleMat = Mat4Scale(1.0f/g3DScale, 1.0f/g3DScale, 1.0f/g3DScale);
+            vertex.position = Mat4TransformPoint(scaleMat, vertex.position);
+            polyD->vertices[j].position = vertex.position;
+        }
+    }
 
     // order the vertices in the polygons
     for(i32 p = 0; p < poly->planesCount; ++p)
@@ -438,31 +486,6 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
         }
     }
 
-    // Set UVs
-    for(i32 i = 0; i < poly->planesCount; ++i)
-    {
-        // for now all our polys have for vertices
-        // so we cant hard code the valus TODO: change this for a more general code
- 
-        Vec2 uvs[4] = {
-            {0, 0}, {1, 0}, {1, 1}, {0, 1}
-        };
-
-        Poly3D *polyD = &polygons[i];
-        for(i32 j = 0; j < polyD->verticesCount; ++j)
-        {
-            Vec2 uv = uvs[j];
-
-            Vec3 wVec =  polyD->vertices[0].position - polyD->vertices[1].position;
-            Vec3 hVec =  polyD->vertices[1].position - polyD->vertices[2].position;
-
-            uv.x *= Vec3Len(wVec) * 0.5f;
-            uv.y *= Vec3Len(hVec) * 0.5f;
-
-            polyD->vertices[j].uv = uv;
-        }
-    }
-
     Vertex *vertices = 0;
     
     for(i32 i = 0; i < poly->planesCount; ++i)
@@ -495,12 +518,35 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
 PolyPlane CreatePolyPlane(Vec2 xMinMax, Vec2 yMinMax, Vec2 zMinMax)
 {
     PolyPlane poly;
+
     poly.planes[0] = { { 1,  0,  0},  xMinMax.y };
     poly.planes[1] = { {-1,  0,  0}, -xMinMax.x };
     poly.planes[2] = { { 0,  1,  0},  yMinMax.y };
     poly.planes[3] = { { 0, -1,  0}, -yMinMax.x };
     poly.planes[4] = { { 0,  0,  1},  zMinMax.y };
     poly.planes[5] = { { 0,  0, -1}, -zMinMax.x };
+
+    poly.axisNormals[0] = { { 0,  0, 1}, {0, -1, 0} };
+    poly.axisNormals[1] = { { 0,  0, 1}, {0, -1, 0} };
+    poly.axisNormals[2] = { { 1,  0, 0}, {0, 0, -1} };
+    poly.axisNormals[3] = { { 1,  0, 0}, {0, 0, -1} };
+    poly.axisNormals[4] = { { 1,  0, 0}, {0, -1, 0} };
+    poly.axisNormals[5] = { { 1,  0, 0}, {0, -1, 0} };
+
+    poly.textureScale[0] = { 1, 1 };
+    poly.textureScale[1] = { 1, 1 };
+    poly.textureScale[2] = { 1, 1 };
+    poly.textureScale[3] = { 1, 1 };
+    poly.textureScale[4] = { 1, 1 };
+    poly.textureScale[5] = { 1, 1 };
+
+    poly.textureOffset[0] = { 0, 0 };
+    poly.textureOffset[1] = { 0, 0 };
+    poly.textureOffset[2] = { 0, 0 };
+    poly.textureOffset[3] = { 0, 0 };
+    poly.textureOffset[4] = { 0, 0 };
+    poly.textureOffset[5] = { 0, 0 };
+
     poly.planesCount = 6;
     return poly;
 }

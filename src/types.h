@@ -136,9 +136,17 @@ struct Ray
     Vec3 d;
 };
 
+struct TextureAxisNormal
+{
+    Vec3 u, v;
+};
+
 struct PolyPlane
 {
     Plane planes[255];
+    TextureAxisNormal axisNormals[255];
+    Vec2 textureScale[255];
+    Vec2 textureOffset[255];
     i32 planesCount;
 };
 

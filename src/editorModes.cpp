@@ -2,7 +2,8 @@ void EditorModeMove3DCamera(View *view)
 {
     // TODO: see how we want to handle this ...
     //if(gCurrentEditorMode != EDITOR_MODE_MOVE_3D_CAMERA)
-    if(gCurrentEditorMode == EDITOR_MODE_SELECT_POLY)
+    if(gCurrentEditorMode == EDITOR_MODE_SELECT_POLY ||
+       gCurrentEditorMode == EDITOR_MODE_SET_TEXTURE)
         return;
 
     ViewPerspState *state = &view->perspState;
@@ -201,11 +202,6 @@ bool MouseInControlPoint(View *view, Vec2 rect)
         return true;
     }
     return false;
-}
-
-void EditorModeAddPoly3D(View *view)
-{
-
 }
 
 void EditorModeModifyPoly(View *view)
@@ -561,4 +557,23 @@ void EditorModeSelectPoly(View *view)
             gCurrentEditorMode = EDITOR_MODE_MODIFY_POLY;
         }
     }
+}
+
+void EditorModeSetTexture(View *view)
+{
+    if(gCurrentEditorMode != EDITOR_MODE_SET_TEXTURE)
+        return;
+
+    if(MouseIsHot(view) && MouseJustDown(MOUSE_BUTTON_LEFT))
+    {
+        i32 clickPolygon = view->mousePicking(view);
+        printf("change texture of the polygon: %d\n", clickPolygon);
+
+
+        PolyPlaneStorage *viewStorage = &gSharedMemory.polyPlaneStorage; 
+        
+
+
+    }
+
 }

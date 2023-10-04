@@ -8,21 +8,32 @@ struct FragmentIn
     float2 uv : TEXCOORD0;
     float3 fragPos : TEXCOORD1;
     float3 viewDir : TEXCOORD2;
+    float4 texDim  : TEXCOORD3;
+    float2 objDim  : TEXCOORD4;
 };
 
 float4 fs_main(FragmentIn i) : SV_TARGET
 {
-    float3 viewPos = i.viewDir;
-    
+    // get all the needed values
     float u = i.uv.x;
-    //u = u * 2.0f;
-    //u = fmod(u, 0.5f);
-
     float v = i.uv.y;
+
+    float w = i.objDim.x;
+    float h = i.objDim.y;
+    float minU = i.texDim.x;
+    float minV = i.texDim.y;
+    float maxU = i.texDim.z;
+    float maxV = i.texDim.w;
+
+    u = minU + fmod(u*w, maxU - minU);
+    v = minV + fmod(v*h, maxV - minV);
 
     float2 uv = float2(u, v);
 
     float3 color = srv.Sample(samplerState, uv).rgb;
+    return float4(color, 1.0f);
+
+    float3 viewPos = i.viewDir;
     float3 lightColor = float3(1.0f, 1.0f, 1.0f);
     float3 lightPos = float3(0, 20, 40);
 

@@ -101,7 +101,7 @@ static HWND InitWindow(HINSTANCE instace)
 
 static void InitD3D11(HWND window)
 {
-    i32 deviceFlags = 0; //D3D11_CREATE_DEVICE_DEBUG;
+    i32 deviceFlags = D3D11_CREATE_DEVICE_DEBUG; //D3D11_CREATE_DEVICE_DEBUG;
 
     D3D_FEATURE_LEVEL featureLevel;
     HRESULT result = D3D11CreateDevice(0, D3D_DRIVER_TYPE_HARDWARE, 0, deviceFlags, 0, 0, D3D11_SDK_VERSION, &device, &featureLevel, &deviceContext);
@@ -710,7 +710,7 @@ void LoadTextureAtlasGpuData(TextureAtlas *atlas)
     texDesc.Usage = D3D11_USAGE_DEFAULT;
     texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
     texDesc.CPUAccessFlags = 0;//D3D11_CPU_ACCESS_WRITE;
-    texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+    texDesc.MiscFlags = 0;//D3D11_RESOURCE_MISC_GENERATE_MIPS;
     if(FAILED(device->CreateTexture2D(&texDesc, 0, &atlas->gpuPixels)))
     {
         printf("Error creating Texture Atlas GPU Texture\n");
@@ -721,7 +721,7 @@ void LoadTextureAtlasGpuData(TextureAtlas *atlas)
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = -1;
+    srvDesc.Texture2D.MipLevels = 1;
     srvDesc.Texture2D.MostDetailedMip = 0;
     if (FAILED(device->CreateShaderResourceView(atlas->gpuPixels, &srvDesc, &atlas->srv)))
     {
@@ -734,7 +734,7 @@ void LoadTextureAtlasGpuData(TextureAtlas *atlas)
     data.SysMemPitch  = atlas->w*sizeof(u32);
     data.SysMemSlicePitch = 0;
     deviceContext->UpdateSubresource(atlas->gpuPixels, 0, 0, data.pSysMem, data.SysMemPitch, 0);
-    deviceContext->GenerateMips(atlas->srv);
+    //deviceContext->GenerateMips(atlas->srv);
 }
 
 void UnloadTextureAtlasGpuData(TextureAtlas *atlas)
@@ -813,8 +813,50 @@ void CopyTextureToAtlas(u32 *dst, i32 xDst, i32 yDst, i32 pDst,
     }
 }
 
+struct iVec2 
+{
+    i32 x, y;
+};
+
+iVec2 ClosestPtToRect(iVec2 p, i32 x, i32 y, i32 w, i32 h)
+{
+    iVec2 result;
+    i32 minX = x;
+    i32 minY = y;
+    i32 maxX = x + w;
+    i32 maxY = y + h;
+    result.x = iMin(iMax(p.x, minX), maxX-1);
+    result.y = iMin(iMax(p.y, minY), maxY-1);
+    return result;
+}
+
+void FillBorders(u32 *dst,
+                 i32 x0, i32 y0, i32 w0, i32 h0,
+                 i32 x1, i32 y1, i32 w1, i32 h1)
+{
+    // Paint the for rectangles
+     for(i32 y = 0; y < h0; ++y)
+    {
+        for(i32 x = 0; x < w0; ++x)
+        {
+            if(x + 1 == w0)
+            {
+                i32 StopHere= 0;
+            }
+
+            i32 xPos = (x0 + x);
+            i32 yPos = (y0 + y);
+            iVec2 closestP = ClosestPtToRect({xPos, yPos}, x1, y1, w1, h1);
+            dst[yPos * gAtlas.w + xPos] = dst[closestP.y * gAtlas.w + closestP.x];
+        }
+    }   
+}
+
 void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
 {
+    static i32 pad = 2; // add a pad of 2px, 1px each side of the texture
+    static i32 hPad = pad/2;
+
     stbi_set_flip_vertically_on_load(false);
     // fisrt load the new texture to be added to the atlas
     i32 width, height, nrComponents;
@@ -845,32 +887,34 @@ void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
     u32 *tmpPixels = (u32 *)malloc(sizeof(u32)*atlas->w*atlas->h);
     memset(tmpPixels, 0, sizeof(u32)*atlas->w*atlas->h);
 
-    i32 oldAtlasW = atlas->w;
-    i32 oldAtlasH = atlas->h;
 
     // for each texture in the atlas we copy it to the new position
     // after the sort
     i32 xPos = 0; // start at one because of the offset
     i32 yPos = 0;
-    i32 yOffset = atlas->textures[0].h;
+    i32 yOffset = atlas->textures[0].h + pad;
     for(i32 i = 0; i < DarraySize(atlas->textures); ++i)
     {
         Texture *texture = atlas->textures + i;
-        i32 xOffset = texture->w;
+        i32 xOffset = texture->w + pad;
 
         if(xPos + xOffset <= atlas->w)
         {
             if(texture->lastAdded)
-                CopyTextureToAtlas(tmpPixels, xPos, yPos, atlas->w, 
+                CopyTextureToAtlas(tmpPixels, xPos + hPad, yPos + hPad, atlas->w, 
                                    (u32 *)pixels, texture->pich, texture->w, texture->h); 
             else
-                CopyTextureToAtlas(tmpPixels, xPos, yPos, atlas->w,
-                                   atlas->cpuPixels, texture->x, texture->y, texture->pich, texture->w, texture->h); 
+                CopyTextureToAtlas(tmpPixels, xPos + hPad, yPos + hPad, atlas->w,
+                                   atlas->cpuPixels, texture->x, texture->y,
+                                   texture->pich, texture->w, texture->h); 
 
-            texture->x = xPos;
-            texture->y = yPos;
+            FillBorders(tmpPixels, xPos, yPos, xOffset, yOffset,
+                                   xPos + hPad, yPos + hPad, texture->w, texture->h);
+
+            texture->x = xPos + hPad;
+            texture->y = yPos + hPad;
             texture->pich = atlas->w;
-            texture->pixels = tmpPixels + yPos * atlas->w + xPos;
+            texture->pixels = tmpPixels + (yPos + hPad)  * atlas->w + (xPos + hPad);
 
             xPos += xOffset;
         }
@@ -878,21 +922,25 @@ void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
         {
             xPos = 0;
             yPos += yOffset;
-            yOffset = texture->h;
+            yOffset = texture->h + pad;
 
             if(yPos + texture->h <= atlas->h)
             {
                 if(texture->lastAdded)
-                    CopyTextureToAtlas(tmpPixels, xPos, yPos, atlas->w, 
+                    CopyTextureToAtlas(tmpPixels, xPos + hPad, yPos + hPad, atlas->w, 
                                        (u32 *)pixels, texture->pich, texture->w, texture->h); 
                 else
-                    CopyTextureToAtlas(tmpPixels, xPos, yPos, atlas->w,
-                                       atlas->cpuPixels, texture->x, texture->y, texture->pich, texture->w, texture->h); 
+                    CopyTextureToAtlas(tmpPixels, xPos + hPad, yPos + hPad, atlas->w,
+                                       atlas->cpuPixels, texture->x, texture->y,
+                                       texture->pich, texture->w, texture->h);
 
-                texture->x = xPos;
-                texture->y = yPos;
+                FillBorders(tmpPixels, xPos, yPos, xOffset, yOffset,
+                                       xPos + hPad, yPos + hPad, texture->w, texture->h);
+
+                texture->x = xPos + hPad;
+                texture->y = yPos + hPad;
                 texture->pich = atlas->w;
-                texture->pixels = tmpPixels + yPos * atlas->w + xPos;
+                texture->pixels = tmpPixels + (yPos + hPad)  * atlas->w + (xPos + hPad);
 
                 xPos += xOffset;
             }
@@ -904,7 +952,7 @@ void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
                 // restart the copy
                 xPos = 0;
                 yPos = 0;
-                yOffset = atlas->textures[0].h;
+                yOffset = atlas->textures[0].h + pad;
                 i =  -1;
                 atlas->w = atlas->w*2;
                 atlas->h = atlas->h*2;

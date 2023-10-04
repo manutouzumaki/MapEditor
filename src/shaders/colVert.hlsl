@@ -9,10 +9,17 @@ cbuffer CBuffer : register(b0)
 
 struct VertexIn
 {
-    float3 pos : POSITION;
-    float3 nor : NORMAL;
-    float4 col : COLOR;
-    float2 uv  : TEXCOORD;
+//    float3 pos : POSITION;
+//    float3 nor : NORMAL;
+//    float4 col : COLOR;
+//    float2 uv  : TEXCOORD;
+
+    float3 pos    : POSITION;
+    float3 nor    : NORMAL;
+    float4 col    : COLOR;
+    float2 uv     : TEXCOORD;
+    float4 texDim : TEXCOORD1;
+    float2 objDim : TEXCOORD2;
 };
 
 struct VertexOut

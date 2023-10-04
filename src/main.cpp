@@ -126,7 +126,7 @@ void ProcessWindowResize(ViewManager *vm, CBuffer *cbuffer, f32 &clientWidth, Re
 }
 
 
-// int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+//int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 int main()
 {
     HINSTANCE instace = GetModuleHandle(0);
@@ -152,13 +152,23 @@ int main()
          0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,
          0, 40, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT,
+         0, 48, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 2, DXGI_FORMAT_R32G32_FLOAT,
+         0, 64, D3D11_INPUT_PER_VERTEX_DATA, 0}
     };
     i32 totalLayoutElements = ARRAY_LENGTH(inputLayoutDesc);
-    device->CreateInputLayout(inputLayoutDesc,
+    HRESULT layoutResult = device->CreateInputLayout(inputLayoutDesc,
         totalLayoutElements,
-        gColShader.vertexShaderCompiled->GetBufferPointer(),
-        gColShader.vertexShaderCompiled->GetBufferSize(),
+        gTexShader.vertexShaderCompiled->GetBufferPointer(),
+        gTexShader.vertexShaderCompiled->GetBufferSize(),
         &layout);
+
+    if(FAILED(layoutResult))
+    {
+        OutputDebugString("ERROR Creating Layout Input\n");
+        ASSERT(!"ERROR");
+    }
 
     // Load Vertex Buffer
     gVertexBuffer = LoadVertexBuffer(gQuad, ARRAY_LENGTH(gQuad), layout);
@@ -187,12 +197,13 @@ int main()
 
     AddTextureToTextureAtlas(&gAtlas, "../assets/grass.png");
     AddTextureToTextureAtlas(&gAtlas, "../assets/brick.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/wood.png");
     AddTextureToTextureAtlas(&gAtlas, "../assets/cool.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/wood.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/noTexture.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/short.png");
 
     gCurrentTexture = gAtlas.textures;
-    //AddTextureToTextureAtlas(&gAtlas, "../assets/noTexture.png");
-    //AddTextureToTextureAtlas(&gAtlas, "../assets/short.png");
+
 
     ShowWindow(window, SW_MAXIMIZE);
 
@@ -217,11 +228,11 @@ int main()
         PresentImGui();
 
         // DRAW TEXTURE ATLAS ON TOP OF THE APPLICATION ONLY FOR DEBUG
-#if 0
+#if 1
         deviceContext->PSSetShaderResources(0, 1, &gAtlas.srv);
         cbuffer.world = Mat4Translate(gCurrentWindowWidth*0.5f,
                                       gCurrentWindowHeight*0.5f,
-                                      -4) * Mat4Scale(gAtlas.w, gAtlas.h, 1);
+                                      -4) * Mat4Scale(gAtlas.w*0.25f, gAtlas.h*0.25f, 1);
         UpdateConstBuffer(&gConstBuffer, (void *)&cbuffer);
         deviceContext->Draw(gVertexBuffer.verticesCount, 0);
 #endif

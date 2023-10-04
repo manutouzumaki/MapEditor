@@ -24,6 +24,18 @@ f32 Max(f32 a, f32 b)
     return b;
 }
 
+i32 iMin(i32 a, i32 b)
+{
+    if(a < b) return a;
+    return b;
+}
+
+i32 iMax(i32 a, i32 b)
+{
+    if(a > b) return a;
+    return b;
+}
+
 f32 Clamp(f32 v, f32 min, f32 max)
 {
     if(v <= min) return min;

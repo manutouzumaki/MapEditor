@@ -7,6 +7,8 @@ struct Vertex
     Vec3 normal;
     Vec4 color;
     Vec2 uv;
+    Vec4 texDim;
+    Vec2 objDim;
 };
 
 struct Shader

@@ -30,8 +30,9 @@ float4 fs_main(FragmentIn i) : SV_TARGET
 
     float2 uv = float2(u, v);
 
+    //float3 color = srv.SampleLevel(samplerState, uv, 0).rgb;
     float3 color = srv.Sample(samplerState, uv).rgb;
-    return float4(color, 1.0f);
+
 
     float3 viewPos = i.viewDir;
     float3 lightColor = float3(1.0f, 1.0f, 1.0f);

@@ -59,8 +59,8 @@ void EditorModeMove3DCamera(View *view)
         f32 deltaX = (f32)(MouseX() - MouseLastX()) * 0.015f;
         f32 deltaY = (f32)(MouseY() - MouseLastY()) * 0.015f;
 
-        state->camera.pos = state->camera.pos + state->camera.right * -deltaX;
-        state->camera.pos = state->camera.pos + state->camera.up * -deltaY;
+        state->camera.pos = state->camera.pos + state->camera.right *  deltaX;
+        state->camera.pos = state->camera.pos + state->camera.up    * -deltaY;
     }
 
     if(state->leftButtonDown || state->rightButtonDown)
@@ -87,8 +87,8 @@ void EditorModeMove3DCamera(View *view)
     state->camera.dir = Mat4TransformVector(Mat4RotateZ(state->camera.rot.z), state->camera.dir);
     state->camera.dir = Vec3Normalized(state->camera.dir);
 
-    state->camera.right = Vec3Normalized(Vec3Cross(state->camera.dir, {0, 1, 0}));
-    state->camera.up =  Vec3Normalized(Vec3Cross(state->camera.right, state->camera.dir));
+    state->camera.right = Vec3Normalized(Vec3Cross({0, 1, 0}, state->camera.dir));
+    state->camera.up =  Vec3Normalized(Vec3Cross(state->camera.dir, state->camera.right));
 
     view->cbuffer.view = Mat4LookAt(state->camera.pos, state->camera.pos + state->camera.dir, {0, 1, 0});
     view->cbuffer.viewDir = state->camera.pos;

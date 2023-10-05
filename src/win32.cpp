@@ -432,7 +432,7 @@ static Shader LoadShader(char *vertpath, char *fragpath)
     HRESULT result = 0;
     ID3DBlob *errorVertexShader = 0;
     result = D3DCompile(vertfile.data, vertfile.size,
-                        0, 0, 0, "vs_main", "vs_4_0",
+                        0, 0, 0, "vs_main", "vs_5_0",
                         D3DCOMPILE_ENABLE_STRICTNESS, 0,
                         &shader.vertexShaderCompiled,
                         &errorVertexShader);
@@ -446,7 +446,7 @@ static Shader LoadShader(char *vertpath, char *fragpath)
 
     ID3DBlob *errorFragmentShader = 0;
     result = D3DCompile(fragfile.data, fragfile.size,
-                        0, 0, 0, "fs_main", "ps_4_0",
+                        0, 0, 0, "fs_main", "ps_5_0",
                         D3DCOMPILE_ENABLE_STRICTNESS, 0,
                         &shader.fragmentShaderCompiled,
                         &errorFragmentShader);
@@ -710,7 +710,7 @@ void LoadTextureAtlasGpuData(TextureAtlas *atlas)
     texDesc.Usage = D3D11_USAGE_DEFAULT;
     texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
     texDesc.CPUAccessFlags = 0;//D3D11_CPU_ACCESS_WRITE;
-    texDesc.MiscFlags = 0;//D3D11_RESOURCE_MISC_GENERATE_MIPS;
+    texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
     if(FAILED(device->CreateTexture2D(&texDesc, 0, &atlas->gpuPixels)))
     {
         printf("Error creating Texture Atlas GPU Texture\n");
@@ -721,7 +721,7 @@ void LoadTextureAtlasGpuData(TextureAtlas *atlas)
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = 1;
+    srvDesc.Texture2D.MipLevels = 5;
     srvDesc.Texture2D.MostDetailedMip = 0;
     if (FAILED(device->CreateShaderResourceView(atlas->gpuPixels, &srvDesc, &atlas->srv)))
     {
@@ -734,7 +734,7 @@ void LoadTextureAtlasGpuData(TextureAtlas *atlas)
     data.SysMemPitch  = atlas->w*sizeof(u32);
     data.SysMemSlicePitch = 0;
     deviceContext->UpdateSubresource(atlas->gpuPixels, 0, 0, data.pSysMem, data.SysMemPitch, 0);
-    //deviceContext->GenerateMips(atlas->srv);
+    deviceContext->GenerateMips(atlas->srv);
 }
 
 void UnloadTextureAtlasGpuData(TextureAtlas *atlas)
@@ -854,8 +854,11 @@ void FillBorders(u32 *dst,
 
 void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
 {
-    static i32 pad = 2; // add a pad of 2px, 1px each side of the texture
+    static i32 pad = 32; // add a pad of 32px, 16px each side of the texture
+    //static i32 pad = 2; // add a pad of 2px, 1px each side of the texture
     static i32 hPad = pad/2;
+    
+    ASSERT(pad >= 0 && ((pad % 2) == 0));
 
     stbi_set_flip_vertically_on_load(false);
     // fisrt load the new texture to be added to the atlas

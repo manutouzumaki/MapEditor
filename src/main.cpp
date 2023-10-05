@@ -201,6 +201,7 @@ int main()
     AddTextureToTextureAtlas(&gAtlas, "../assets/wood.png");
     AddTextureToTextureAtlas(&gAtlas, "../assets/noTexture.png");
     AddTextureToTextureAtlas(&gAtlas, "../assets/short.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/white.png");
 
     gCurrentTexture = gAtlas.textures;
 
@@ -228,11 +229,11 @@ int main()
         PresentImGui();
 
         // DRAW TEXTURE ATLAS ON TOP OF THE APPLICATION ONLY FOR DEBUG
-#if 1
+#if 0
         deviceContext->PSSetShaderResources(0, 1, &gAtlas.srv);
         cbuffer.world = Mat4Translate(gCurrentWindowWidth*0.5f,
                                       gCurrentWindowHeight*0.5f,
-                                      -4) * Mat4Scale(gAtlas.w*0.25f, gAtlas.h*0.25f, 1);
+                                      -4) * Mat4Scale(gAtlas.w, gAtlas.h, 1);
         UpdateConstBuffer(&gConstBuffer, (void *)&cbuffer);
         deviceContext->Draw(gVertexBuffer.verticesCount, 0);
 #endif

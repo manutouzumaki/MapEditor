@@ -423,9 +423,9 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
             v = Remap(-1.0f, 1.0f, 0.0f, 1.0f, v);
 
             f32 minU = (f32)gCurrentTexture->x / (f32)gAtlas.w;
-            f32 maxU = ((f32)gCurrentTexture->x + (f32)gCurrentTexture->w) / (f32)(gAtlas.w + 1);
+            f32 maxU = ((f32)gCurrentTexture->x + (f32)gCurrentTexture->w) / (f32)gAtlas.w;
             f32 minV = (f32)gCurrentTexture->y / (f32)gAtlas.h;
-            f32 maxV = ((f32)gCurrentTexture->y + (f32)gCurrentTexture->h) / (f32)(gAtlas.h + 1);
+            f32 maxV = ((f32)gCurrentTexture->y + (f32)gCurrentTexture->h) / (f32)gAtlas.h;
 
             u *= ((f32)gCurrentTexture->w / (f32)gAtlas.w);
             v *= ((f32)gCurrentTexture->h / (f32)gAtlas.h);
@@ -442,7 +442,7 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
             yDim = fabsf(Vec3Dot(texAxis.v, polyD->vertices[j].position - center));
             yDim = yDim / (gUnitSize*0.5f);
 
-            polyD->vertices[j].objDim = {floorf(xDim), floorf(yDim)};
+            polyD->vertices[j].objDim = {xDim, yDim};
         }
 
         for(i32 j = 0; j < polyD->verticesCount; ++j)

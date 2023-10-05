@@ -773,13 +773,13 @@ void SortTextureByHeightInTextuerAtlas(TextureAtlas *atlas)
         swapped = false;
         for(i32 j = 0; j < DarraySize(atlas->textures) - i - 1; ++j)
         {
-            Texture a = atlas->textures[j + 0];
-            Texture b = atlas->textures[j + 1];
-            if(a.h < b.h)
+            Texture *a = atlas->textures + j;
+            Texture *b = atlas->textures + j + 1;
+            if(a->h < b->h)
             {
-                Texture tmp = a;
-                a = b;
-                b = tmp;
+                Texture tmp = *a;
+                *a = *b;
+                *b = tmp;
                 swapped = true;
             }
         }

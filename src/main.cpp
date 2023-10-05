@@ -195,13 +195,13 @@ int main()
 
     gAtlas = LoadTextureAtlas(256, 256);
 
+    AddTextureToTextureAtlas(&gAtlas, "../assets/short.png");
+    AddTextureToTextureAtlas(&gAtlas, "../assets/white.png");
     AddTextureToTextureAtlas(&gAtlas, "../assets/grass.png");
     AddTextureToTextureAtlas(&gAtlas, "../assets/brick.png");
     AddTextureToTextureAtlas(&gAtlas, "../assets/cool.png");
     AddTextureToTextureAtlas(&gAtlas, "../assets/wood.png");
     AddTextureToTextureAtlas(&gAtlas, "../assets/noTexture.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/short.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/white.png");
 
     gCurrentTexture = gAtlas.textures;
 

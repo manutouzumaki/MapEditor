@@ -44,7 +44,7 @@ static Shader gTex2DShader;
 static ConstBuffer gConstBuffer;
 static VertexBuffer gVertexBuffer;
 static DynamicVertexBuffer gDynamicVertexBuffer;
-static TextureAtlas gAtlas;
+static TextureArray gTextureArray;
 static Vertex gQuad[] = {
     // Face 1
     {{-0.5f, -0.5f, 0}, {0, 0, 1}, {0.8, 0.8, 0.8, 1}, {0, 1}},
@@ -85,7 +85,7 @@ enum ControlPoint
 // TODO: see what to do with this ones
 static EditorMode gCurrentEditorMode;
 static SharedMemory gSharedMemory;
-static Texture *gCurrentTexture;
+static u32 gCurrentTexture;
 
 #include "darray.cpp"
 #include "input.cpp"
@@ -126,8 +126,8 @@ void ProcessWindowResize(ViewManager *vm, CBuffer *cbuffer, f32 &clientWidth, Re
 }
 
 
-//int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-int main()
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+//int main()
 {
     HINSTANCE instace = GetModuleHandle(0);
     HWND window = InitWindow(instace);
@@ -152,10 +152,8 @@ int main()
          0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,
          0, 40, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TEXCOORD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT,
-         0, 48, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TEXCOORD", 2, DXGI_FORMAT_R32G32_FLOAT,
-         0, 64, D3D11_INPUT_PER_VERTEX_DATA, 0}
+        {"TEXCOORD", 1, DXGI_FORMAT_R32_UINT,
+         0, 48, D3D11_INPUT_PER_VERTEX_DATA, 0}
     };
     i32 totalLayoutElements = ARRAY_LENGTH(inputLayoutDesc);
     HRESULT layoutResult = device->CreateInputLayout(inputLayoutDesc,
@@ -193,17 +191,13 @@ int main()
     cbuffer.viewDir = {};
     gConstBuffer = LoadConstBuffer((void *)&cbuffer, sizeof(CBuffer), 0);
 
-    gAtlas = LoadTextureAtlas(256, 256);
+    LoadTextureToTextureArray(&gTextureArray, "../assets/wood.png");
+    LoadTextureToTextureArray(&gTextureArray, "../assets/white.png");
+    LoadTextureToTextureArray(&gTextureArray, "../assets/brick.png");
+    LoadTextureToTextureArray(&gTextureArray, "../assets/grass.png");
+    LoadTextureToTextureArray(&gTextureArray, "../assets/cool.png");
+    LoadTextureToTextureArray(&gTextureArray, "../assets/noTexture.png");
 
-    AddTextureToTextureAtlas(&gAtlas, "../assets/short.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/white.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/grass.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/brick.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/cool.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/wood.png");
-    AddTextureToTextureAtlas(&gAtlas, "../assets/noTexture.png");
-
-    gCurrentTexture = gAtlas.textures;
 
 
     ShowWindow(window, SW_MAXIMIZE);
@@ -227,16 +221,6 @@ int main()
         // Render GUI
         RenderImGui();
         PresentImGui();
-
-        // DRAW TEXTURE ATLAS ON TOP OF THE APPLICATION ONLY FOR DEBUG
-#if 0
-        deviceContext->PSSetShaderResources(0, 1, &gAtlas.srv);
-        cbuffer.world = Mat4Translate(gCurrentWindowWidth*0.5f,
-                                      gCurrentWindowHeight*0.5f,
-                                      -4) * Mat4Scale(gAtlas.w, gAtlas.h, 1);
-        UpdateConstBuffer(&gConstBuffer, (void *)&cbuffer);
-        deviceContext->Draw(gVertexBuffer.verticesCount, 0);
-#endif
         
         // Swap main Buffer
         swapChain->Present(1, 0);
@@ -244,7 +228,7 @@ int main()
         gLastInput = gInput;
     }
 
-    UnloadTextureAtlas(&gAtlas);
+    UnloadTextureArray(&gTextureArray);
 
     ShutDownImGui();
 

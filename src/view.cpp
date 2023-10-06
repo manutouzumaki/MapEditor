@@ -398,8 +398,7 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
         // for now all our polys have for vertices
         // so we cant hard code the valus TODO: change this for a more general code
         TextureAxisNormal texAxis = poly->axisNormals[i];
-        Vec2 texScale = poly->textureScale[i];
-        Vec2 texOffset = poly->textureOffset[i];
+        u32 texture = poly->textures[i];
 
         Poly3D *polyD = &polygons[i];
         Vec3 center = GetCenterOfPolygon(polyD);
@@ -422,16 +421,7 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
             u = Remap(-1.0f, 1.0f, 0.0f, 1.0f, u);
             v = Remap(-1.0f, 1.0f, 0.0f, 1.0f, v);
 
-            f32 minU = (f32)gCurrentTexture->x / (f32)gAtlas.w;
-            f32 maxU = ((f32)gCurrentTexture->x + (f32)gCurrentTexture->w) / (f32)gAtlas.w;
-            f32 minV = (f32)gCurrentTexture->y / (f32)gAtlas.h;
-            f32 maxV = ((f32)gCurrentTexture->y + (f32)gCurrentTexture->h) / (f32)gAtlas.h;
-
-            u *= ((f32)gCurrentTexture->w / (f32)gAtlas.w);
-            v *= ((f32)gCurrentTexture->h / (f32)gAtlas.h);
-
-            polyD->vertices[j].uv = { u, v };
-            polyD->vertices[j].texDim = { minU, minV, maxU, maxV };
+            polyD->vertices[j].texture = texture;
 
             // calculate object face dim
             f32 xDim, yDim;
@@ -442,7 +432,9 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
             yDim = fabsf(Vec3Dot(texAxis.v, polyD->vertices[j].position - center));
             yDim = yDim / (gUnitSize*0.5f);
 
-            polyD->vertices[j].objDim = {xDim, yDim};
+
+            polyD->vertices[j].uv = { u*xDim, v*yDim };
+
         }
 
         for(i32 j = 0; j < polyD->verticesCount; ++j)
@@ -545,19 +537,12 @@ PolyPlane CreatePolyPlane(Vec2 xMinMax, Vec2 yMinMax, Vec2 zMinMax)
     poly.axisNormals[4] = { { 1,  0, 0}, {0, -1, 0} };
     poly.axisNormals[5] = { { 1,  0, 0}, {0, -1, 0} };
 
-    poly.textureScale[0] = { 1, 1 };
-    poly.textureScale[1] = { 1, 1 };
-    poly.textureScale[2] = { 1, 1 };
-    poly.textureScale[3] = { 1, 1 };
-    poly.textureScale[4] = { 1, 1 };
-    poly.textureScale[5] = { 1, 1 };
-
-    poly.textureOffset[0] = { 0, 0 };
-    poly.textureOffset[1] = { 0, 0 };
-    poly.textureOffset[2] = { 0, 0 };
-    poly.textureOffset[3] = { 0, 0 };
-    poly.textureOffset[4] = { 0, 0 };
-    poly.textureOffset[5] = { 0, 0 };
+    poly.textures[0] = gCurrentTexture;
+    poly.textures[1] = gCurrentTexture;
+    poly.textures[2] = gCurrentTexture;
+    poly.textures[3] = gCurrentTexture;
+    poly.textures[4] = gCurrentTexture;
+    poly.textures[5] = gCurrentTexture;
 
     poly.planesCount = 6;
     return poly;
@@ -618,6 +603,7 @@ void ViewUpdatePolyPlane(i32 index)
 
     // reload the dynamic vertex buffer
     gDynamicVertexBuffer.used = 0;
+    gDynamicVertexBuffer.verticesCount = 0;
     for(i32 i = 0; i < polyPlaneStorage->polygonsCount; ++i)
     {
         PushPolyPlaneToVertexBuffer(polyPlaneStorage->polygons + i);

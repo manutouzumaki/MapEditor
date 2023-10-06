@@ -1,4 +1,4 @@
-Texture2D srv : register(t0);
+Texture2DArray srv : register(t0);
 SamplerState samplerState : register(s0);
 
 struct FragmentIn
@@ -8,31 +8,13 @@ struct FragmentIn
     float2 uv : TEXCOORD0;
     float3 fragPos : TEXCOORD1;
     float3 viewDir : TEXCOORD2;
-    float4 texDim  : TEXCOORD3;
-    float2 objDim  : TEXCOORD4;
+    unsigned int    tex     : TEXCOORD3;
 };
 
 float4 fs_main(FragmentIn i) : SV_TARGET
 {
-    // get all the needed values
-    float u = i.uv.x;
-    float v = i.uv.y;
 
-    float w = i.objDim.x;
-    float h = i.objDim.y;
-    float minU = i.texDim.x;
-    float minV = i.texDim.y;
-    float maxU = i.texDim.z;
-    float maxV = i.texDim.w;
-
-    u = minU + fmod(u*w, maxU - minU);
-    v = minV + fmod(v*h, maxV - minV);
-
-    float2 uv = float2(u, v);
-
-    //float3 color = srv.SampleLevel(samplerState, uv, 0).rgb;
-    float3 color = srv.Sample(samplerState, uv).rgb;
-
+    float3 color = srv.Sample(samplerState, float3(i.uv, i.tex)).rgb;
 
     float3 viewPos = i.viewDir;
     float3 lightColor = float3(1.0f, 1.0f, 1.0f);

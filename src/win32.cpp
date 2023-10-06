@@ -255,11 +255,11 @@ static void InitD3D11(HWND window)
     device->CreateRasterizerState(&wireFrameRasterizerDesc, &wireFrameRasterizer);
 
     // Create Sampler State
-    D3D11_SAMPLER_DESC colorMapDesc = {};
+    D3D11_SAMPLER_DESC colorMapDesc;
     // D3D11_TEXTURE_ADDRESS_CLAMP; D3D11_TEXTURE_ADDRESS_WRAP;
-    colorMapDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP; 
-    colorMapDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP; 
-    colorMapDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP; 
+    colorMapDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP; 
+    colorMapDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP; 
+    colorMapDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP; 
     colorMapDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
     colorMapDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR; //D3D11_FILTER_MIN_MAG_MIP_LINEAR | D3D11_FILTER_MIN_MAG_MIP_POINT
     colorMapDesc.MaxLOD = D3D11_FLOAT32_MAX;
@@ -696,14 +696,16 @@ void ResizeFrameBuffer(FrameBuffer *frameBuffer, f32 x, f32 y, f32 width, f32 he
     *frameBuffer = LoadFrameBuffer(x, y, width, height, frameBuffer->format);
 }
 
-void LoadTextureAtlasGpuData(TextureAtlas *atlas)
+void LoadTextureArrayGpuData(TextureArray *array)
 {
+    u32 mipLevels = 8;
+
     // Create the GPU stuff
     D3D11_TEXTURE2D_DESC texDesc;
-    texDesc.Width = atlas->w;
-    texDesc.Height = atlas->h;
-    texDesc.MipLevels = 0;
-    texDesc.ArraySize = 1;
+    texDesc.Width = array->cpuTextureArray[0].w;
+    texDesc.Height = array->cpuTextureArray[0].w;
+    texDesc.MipLevels = mipLevels;
+    texDesc.ArraySize = array->size;
     texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     texDesc.SampleDesc.Count = 1;
     texDesc.SampleDesc.Quality = 0;
@@ -711,155 +713,56 @@ void LoadTextureAtlasGpuData(TextureAtlas *atlas)
     texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
     texDesc.CPUAccessFlags = 0;//D3D11_CPU_ACCESS_WRITE;
     texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-    if(FAILED(device->CreateTexture2D(&texDesc, 0, &atlas->gpuPixels)))
+
+    if(FAILED(device->CreateTexture2D(&texDesc, 0, &array->gpuTextureArray)))
     {
-        printf("Error creating Texture Atlas GPU Texture\n");
+        printf("Error creating Texture Array GPU Texture\n");
         ASSERT(!"INVALID_CODE_PATH");
     }
+
+    D3D11_SUBRESOURCE_DATA *data = (D3D11_SUBRESOURCE_DATA *)malloc(sizeof(D3D11_SUBRESOURCE_DATA)*array->size*mipLevels);
+
+    for(i32 i = 0; i < array->size; ++i)
+    {
+        u32 index = i*mipLevels;
+        data[index].pSysMem = array->cpuTextureArray[i].pixels;
+        data[index].SysMemPitch  = array->cpuTextureArray[i].w*sizeof(u32);
+        data[index].SysMemSlicePitch = 0;
+
+        deviceContext->UpdateSubresource(array->gpuTextureArray, D3D11CalcSubresource(0, i, mipLevels), 0, data[index].pSysMem, data[index].SysMemPitch, 0);
+    }
+
+
+    free(data);
 
     // create shader resource view
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = 5;
-    srvDesc.Texture2D.MostDetailedMip = 0;
-    if (FAILED(device->CreateShaderResourceView(atlas->gpuPixels, &srvDesc, &atlas->srv)))
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+    srvDesc.Texture2DArray.MipLevels = mipLevels;
+    srvDesc.Texture2DArray.MostDetailedMip = 0;
+    srvDesc.Texture2DArray.FirstArraySlice = 0;
+    srvDesc.Texture2DArray.ArraySize = array->size;
+    if (FAILED(device->CreateShaderResourceView(array->gpuTextureArray, &srvDesc, &array->srv)))
     {
-        printf("Error creating Atlas srv\n");
+        printf("Error creating Texture Array srv\n");
         ASSERT(!"INVALID_CODE_PATH");
     }
+    deviceContext->GenerateMips(array->srv);
 
-    D3D11_SUBRESOURCE_DATA data = {};
-    data.pSysMem = atlas->cpuPixels;
-    data.SysMemPitch  = atlas->w*sizeof(u32);
-    data.SysMemSlicePitch = 0;
-    deviceContext->UpdateSubresource(atlas->gpuPixels, 0, 0, data.pSysMem, data.SysMemPitch, 0);
-    deviceContext->GenerateMips(atlas->srv);
+
 }
 
-void UnloadTextureAtlasGpuData(TextureAtlas *atlas)
+void UnloadTextureArrayGpuData(TextureArray *array)
 {
-    if(atlas->gpuPixels) atlas->gpuPixels->Release(); atlas->gpuPixels = 0;
-    if(atlas->srv) atlas->srv->Release(); atlas->srv = 0;
+    if(array->gpuTextureArray) array->gpuTextureArray->Release(); array->gpuTextureArray = 0;
+    if(array->srv) array->srv->Release(); array->srv = 0;
 }
 
-TextureAtlas LoadTextureAtlas(i32 width, i32 height)
+void LoadTextureToTextureArray(TextureArray *array, char * filepath)
 {
-    TextureAtlas atlas = {};
 
     // Create the CPU stuff
-    atlas.w = width;
-    atlas.h = height;
-    atlas.textures = 0;
-    atlas.cpuPixels = (u32 *)malloc(sizeof(u32)*width*height);
-
-    LoadTextureAtlasGpuData(&atlas);
-
-    return atlas;
-}
-
-void UnloadTextureAtlas(TextureAtlas *atlas)
-{
-    if(atlas->cpuPixels) free(atlas->cpuPixels);
-    UnloadTextureAtlasGpuData(atlas);
-
-}
-
-void SortTextureByHeightInTextuerAtlas(TextureAtlas *atlas)
-{
-    bool swapped;
-    for(i32 i = 0; i < DarraySize(atlas->textures) - 1; ++i)
-    {
-        swapped = false;
-        for(i32 j = 0; j < DarraySize(atlas->textures) - i - 1; ++j)
-        {
-            Texture *a = atlas->textures + j;
-            Texture *b = atlas->textures + j + 1;
-            if(a->h < b->h)
-            {
-                Texture tmp = *a;
-                *a = *b;
-                *b = tmp;
-                swapped = true;
-            }
-        }
-
-        if(swapped == false)
-            break;
-    }
-}
-
-void CopyTextureToAtlas(u32 *dst, i32 xDst, i32 yDst, i32 pDst,
-                        u32 *src, i32 xSrc, i32 ySrc, i32 pSrc, i32 wSrc, i32 hSrc)
-{
-    for(i32 y = 0; y < hSrc; ++y)
-    {
-        for(i32 x = 0; x < wSrc; ++x)
-        {
-            dst[(yDst + y) * pDst + (xDst + x)] = src[(ySrc + y) * pSrc + (xSrc + x)];
-        }
-    }
-}
-
-void CopyTextureToAtlas(u32 *dst, i32 xDst, i32 yDst, i32 pDst,
-                        u32 *src, i32 pSrc, i32 wSrc, i32 hSrc)
-{
-    for(i32 y = 0; y < hSrc; ++y)
-    {
-        for(i32 x = 0; x < wSrc; ++x)
-        {
-            dst[(yDst + y) * pDst + (xDst + x)] = src[y * pSrc + x];
-        }
-    }
-}
-
-struct iVec2 
-{
-    i32 x, y;
-};
-
-iVec2 ClosestPtToRect(iVec2 p, i32 x, i32 y, i32 w, i32 h)
-{
-    iVec2 result;
-    i32 minX = x;
-    i32 minY = y;
-    i32 maxX = x + w;
-    i32 maxY = y + h;
-    result.x = iMin(iMax(p.x, minX), maxX-1);
-    result.y = iMin(iMax(p.y, minY), maxY-1);
-    return result;
-}
-
-void FillBorders(u32 *dst,
-                 i32 x0, i32 y0, i32 w0, i32 h0,
-                 i32 x1, i32 y1, i32 w1, i32 h1)
-{
-    // Paint the for rectangles
-     for(i32 y = 0; y < h0; ++y)
-    {
-        for(i32 x = 0; x < w0; ++x)
-        {
-            if(x + 1 == w0)
-            {
-                i32 StopHere= 0;
-            }
-
-            i32 xPos = (x0 + x);
-            i32 yPos = (y0 + y);
-            iVec2 closestP = ClosestPtToRect({xPos, yPos}, x1, y1, w1, h1);
-            dst[yPos * gAtlas.w + xPos] = dst[closestP.y * gAtlas.w + closestP.x];
-        }
-    }   
-}
-
-void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
-{
-    static i32 pad = 32; // add a pad of 32px, 16px each side of the texture
-    //static i32 pad = 2; // add a pad of 2px, 1px each side of the texture
-    static i32 hPad = pad/2;
-    
-    ASSERT(pad >= 0 && ((pad % 2) == 0));
-
     stbi_set_flip_vertically_on_load(false);
     // fisrt load the new texture to be added to the atlas
     i32 width, height, nrComponents;
@@ -871,110 +774,72 @@ void AddTextureToTextureAtlas(TextureAtlas *atlas, char *filepath)
         ASSERT(!"INVALID_CODE_PATH");
     }
 
-    Texture newTexture = {};
-    newTexture.x = -1;
-    newTexture.y = -1;
-    newTexture.w = width;
-    newTexture.h = height;
-    newTexture.pich = width;
-    newTexture.pixels = (u32 *)pixels;
-    newTexture.lastAdded = true;
-   
-    DarrayPush(atlas->textures, newTexture, Texture);
-
-    SortTextureByHeightInTextuerAtlas(atlas);
+    Texture texture = {};
+    texture.w = width;
+    texture.h = height;
+    texture.pixels = (u32 *)malloc(sizeof(u32)*width*height);
+    memcpy(texture.pixels, pixels, sizeof(u32)*width*height);
+    DarrayPush(array->cpuTextureArray, texture, Texture);
 
 
-    // update texture atlas
-    // create a copy of the old pixel we need to save the pixels value to copy them
-    u32 *tmpPixels = (u32 *)malloc(sizeof(u32)*atlas->w*atlas->h);
-    memset(tmpPixels, 0, sizeof(u32)*atlas->w*atlas->h);
-
-
-    // for each texture in the atlas we copy it to the new position
-    // after the sort
-    i32 xPos = 0; // start at one because of the offset
-    i32 yPos = 0;
-    i32 yOffset = atlas->textures[0].h + pad;
-    for(i32 i = 0; i < DarraySize(atlas->textures); ++i)
+    D3D11_TEXTURE2D_DESC texDesc;
+    texDesc.Width = width;
+    texDesc.Height = height;
+    texDesc.MipLevels = 0;
+    texDesc.ArraySize = 1;
+    texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.SampleDesc.Quality = 0;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    texDesc.CPUAccessFlags = 0;
+    texDesc.MiscFlags = 0;
+    ID3D11Texture2D *guiTexture = 0;
+    if(FAILED(device->CreateTexture2D(&texDesc, 0, &guiTexture)))
     {
-        Texture *texture = atlas->textures + i;
-        i32 xOffset = texture->w + pad;
-
-        if(xPos + xOffset <= atlas->w)
-        {
-            if(texture->lastAdded)
-                CopyTextureToAtlas(tmpPixels, xPos + hPad, yPos + hPad, atlas->w, 
-                                   (u32 *)pixels, texture->pich, texture->w, texture->h); 
-            else
-                CopyTextureToAtlas(tmpPixels, xPos + hPad, yPos + hPad, atlas->w,
-                                   atlas->cpuPixels, texture->x, texture->y,
-                                   texture->pich, texture->w, texture->h); 
-
-            FillBorders(tmpPixels, xPos, yPos, xOffset, yOffset,
-                                   xPos + hPad, yPos + hPad, texture->w, texture->h);
-
-            texture->x = xPos + hPad;
-            texture->y = yPos + hPad;
-            texture->pich = atlas->w;
-            texture->pixels = tmpPixels + (yPos + hPad)  * atlas->w + (xPos + hPad);
-
-            xPos += xOffset;
-        }
-        else
-        {
-            xPos = 0;
-            yPos += yOffset;
-            yOffset = texture->h + pad;
-
-            if(yPos + texture->h <= atlas->h)
-            {
-                if(texture->lastAdded)
-                    CopyTextureToAtlas(tmpPixels, xPos + hPad, yPos + hPad, atlas->w, 
-                                       (u32 *)pixels, texture->pich, texture->w, texture->h); 
-                else
-                    CopyTextureToAtlas(tmpPixels, xPos + hPad, yPos + hPad, atlas->w,
-                                       atlas->cpuPixels, texture->x, texture->y,
-                                       texture->pich, texture->w, texture->h);
-
-                FillBorders(tmpPixels, xPos, yPos, xOffset, yOffset,
-                                       xPos + hPad, yPos + hPad, texture->w, texture->h);
-
-                texture->x = xPos + hPad;
-                texture->y = yPos + hPad;
-                texture->pich = atlas->w;
-                texture->pixels = tmpPixels + (yPos + hPad)  * atlas->w + (xPos + hPad);
-
-                xPos += xOffset;
-            }
-            else
-            {
-                // resize the buffer
-                tmpPixels = (u32 *)realloc(tmpPixels, sizeof(u32)*(atlas->w*2)*(atlas->h)*2);
-                memset(tmpPixels, 0, sizeof(u32)*(atlas->w*2)*(atlas->h)*2);
-                // restart the copy
-                xPos = 0;
-                yPos = 0;
-                yOffset = atlas->textures[0].h + pad;
-                i =  -1;
-                atlas->w = atlas->w*2;
-                atlas->h = atlas->h*2;
-
-            }
-        }  
+        printf("Error creating Textures for GUI\n");
+        ASSERT(!"INVALID_CODE_PATH");
     }
+    D3D11_SUBRESOURCE_DATA data = {};
+    data.pSysMem = pixels;
+    data.SysMemPitch  = width*sizeof(u32);
+    data.SysMemSlicePitch = 0;
+    deviceContext->UpdateSubresource(guiTexture, 0, 0, data.pSysMem, data.SysMemPitch, 0);
+    DarrayPush(array->guiTextures, guiTexture, ID3D11Texture2D *);
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+    ID3D11ShaderResourceView *guiSrv =  0;
+    if (FAILED(device->CreateShaderResourceView(guiTexture, &srvDesc, &guiSrv)))
+    {
+        printf("Error creating Srv for GUI\n");
+        ASSERT(!"INVALID_CODE_PATH");
+    }
+    DarrayPush(array->guiSrv, guiSrv, ID3D11ShaderResourceView *);
+
+    array->size++;
 
     stbi_image_free(pixels);
-    free(atlas->cpuPixels);
-    atlas->cpuPixels = tmpPixels;
 
-    UnloadTextureAtlasGpuData(atlas);
-    LoadTextureAtlasGpuData(atlas);
+    UnloadTextureArrayGpuData(array);
+    LoadTextureArrayGpuData(array);
 
-    for(i32 i = 0; i < DarraySize(atlas->textures); ++i)
-    {
-        Texture *texture = atlas->textures + i;
-        texture->lastAdded = false;
-    }
 }
 
+void UnloadTextureArray(TextureArray *array)
+{
+    for(i32 i = 0; i < DarraySize(array->cpuTextureArray); ++i)
+    {
+        free(array->cpuTextureArray[i].pixels);
+        array->guiTextures[i]->Release();
+        array->guiSrv[i]->Release();
+        
+    }
+    DarrayDestroy(array->cpuTextureArray);
+    UnloadTextureArrayGpuData(array);
+
+
+}

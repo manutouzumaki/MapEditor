@@ -42,31 +42,27 @@ void RenderImGui()
     ImGui::RadioButton("Set Texture", &(i32)gCurrentEditorMode, EDITOR_MODE_SET_TEXTURE);
 
     ImGui::Text("Textures:");
-    ImTextureID textureId = gAtlas.srv;
 
-    for(i32 i = 0; i < DarraySize(gAtlas.textures); ++i)
+    for(i32 i = 0; i < gTextureArray.size; ++i)
     {
-        Texture *texture = gAtlas.textures + i;
-        f32 minX = texture->x;
-        f32 maxX = texture->x + texture->w;
-        f32 minY = texture->y;
-        f32 maxY = texture->y + texture->h;
+        ImTextureID textureId = gTextureArray.guiSrv[i];
+        Texture *texture = gTextureArray.cpuTextureArray + i;
+        f32 uMin = 0;
+        f32 vMin = 0;
 
-        f32 uMin = minX / (f32)gAtlas.w;
-        f32 vMin = minY / (f32)gAtlas.h;
-
-        f32 uMax = maxX / (f32)gAtlas.w;
-        f32 vMax = maxY / (f32)gAtlas.h;
+        f32 uMax = 1;
+        f32 vMax = 1;
 
         ImVec2 uvMin = ImVec2(uMin, vMin);
         ImVec2 uvMax = ImVec2(uMax, vMax);
+
         ImVec4 tintCol = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
         ImVec4 backCol = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
         
         ImGui::PushID(i);
         if(ImGui::ImageButton(textureId, ImVec2(170, 170), uvMin, uvMax, 1, backCol, tintCol))
         {
-            gCurrentTexture = texture; 
+            gCurrentTexture = i; 
         }
         ImGui::PopID();
     }

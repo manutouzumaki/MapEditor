@@ -7,8 +7,7 @@ struct Vertex
     Vec3 normal;
     Vec4 color;
     Vec2 uv;
-    Vec4 texDim;
-    Vec2 objDim;
+    u32 texture; 
 };
 
 struct Shader
@@ -37,34 +36,29 @@ struct DynamicVertexBuffer
 {
     ID3D11Buffer *GPUBuffer;
     Vertex *CPUBuffer;
-    u32 verticesCount;
-
     ID3D11InputLayout *layout;
 
     size_t size;
     size_t used;
+    u32 verticesCount;
 };
 
 struct Texture
 {
     u32 *pixels;
-    i32 x, y;
     i32 w, h;
-    i32 pich;
-
-    bool lastAdded;
 };
 
-struct TextureAtlas
+// we are not going to use a texture atlas any more\
+// we are going to use a texture Array
+struct TextureArray
 {
-    i32 w, h;
-    
-    u32 *cpuPixels;
-    ID3D11Texture2D *gpuPixels;
     ID3D11ShaderResourceView *srv;
-
-    // a Darray to handle the textures inside the atlas
-    Texture *textures;
+    ID3D11Texture2D *gpuTextureArray;
+    Texture         *cpuTextureArray;
+    ID3D11Texture2D **guiTextures;
+    ID3D11ShaderResourceView **guiSrv;
+    u32 size;
 };
 
 struct FrameBuffer
@@ -147,8 +141,7 @@ struct PolyPlane
 {
     Plane planes[255];
     TextureAxisNormal axisNormals[255];
-    Vec2 textureScale[255];
-    Vec2 textureOffset[255];
+    u32 textures[255];
     i32 planesCount;
 };
 

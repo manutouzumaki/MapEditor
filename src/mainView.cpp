@@ -21,7 +21,7 @@ void ProcessMainView(View *view)
 
 void RenderMainView(View *view)
 {
-    deviceContext->PSSetShaderResources(0, 1, &gAtlas.srv);
+    deviceContext->PSSetShaderResources(0, 1, &gTextureArray.srv);
     deviceContext->VSSetShader(gTexShader.vertex, 0, 0);
     deviceContext->PSSetShader(gTexShader.fragment, 0, 0);
 

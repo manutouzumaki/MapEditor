@@ -10,7 +10,7 @@ set LNK_DIR=
 
 pushd ..\build
 
-    REM cl %CFLAGS% %INC_DIR% %SOURCES% /Fe.\TMMapEditor /link %LNK_DIR% %LIBS% /SUBSYSTEM:CONSOLE
-    cl %CFLAGS% %INC_DIR% %SOURCES% /Fe.\TMMapEditor /link %LNK_DIR% %LIBS% /SUBSYSTEM:WINDOWS
+    cl %CFLAGS% %INC_DIR% %SOURCES% /Fe.\TMMapEditor /link %LNK_DIR% %LIBS% /SUBSYSTEM:CONSOLE
+    REM cl %CFLAGS% %INC_DIR% %SOURCES% /Fe.\TMMapEditor /link %LNK_DIR% %LIBS% /SUBSYSTEM:WINDOWS
 
 popd

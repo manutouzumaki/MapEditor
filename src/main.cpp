@@ -64,6 +64,7 @@ enum EditorMode
     EDITOR_MODE_MODIFY_POLY,
     EDITOR_MODE_MOVE_3D_CAMERA,
     EDITOR_MODE_SET_TEXTURE,
+    EDITOR_MODE_CLIPPING,
 
     EDITOR_MODE_COUNT
 };
@@ -126,8 +127,8 @@ void ProcessWindowResize(ViewManager *vm, CBuffer *cbuffer, f32 &clientWidth, Re
 }
 
 
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-//int main()
+//int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+int main()
 {
     HINSTANCE instace = GetModuleHandle(0);
     HWND window = InitWindow(instace);

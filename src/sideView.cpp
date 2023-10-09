@@ -48,6 +48,15 @@ static void UpdateFrontAndTopViewsPolys(RectMinMax rect, i32 quadIndex, u32 colo
     topStorage->polygons[quadIndex] = poly;
 }
 
+Plane CreateSideClipPlane(Vec2 a, Vec2 b)
+{
+    Vec3 v0 = { 0.0f,  a.y, a.x};
+    Vec3 v1 = { 0.0f,  b.y, b.x};
+    Vec3 v2 = {-64.0f, a.y, a.x};
+    Plane plane = GetPlaneFromThreePoints(v0, v1, v2);
+    return plane;
+}
+
 
 void SetupSideView(View *view)
 {
@@ -56,6 +65,7 @@ void SetupSideView(View *view)
     ViewOrthoBaseSetup(view);
     state->addOtherViewsPolys = AddFrontAndTopViewsPolys;
     state->updateOtherViewsPolys = UpdateFrontAndTopViewsPolys;
+    state->createViewClipPlane = CreateSideClipPlane;
     state->controlPointDown = -1;
     view->mousePicking = MousePicking2D;
 }
@@ -67,6 +77,7 @@ void ProcessSideView(View *view)
     EditorModeAddPoly(view);
     EditorModeModifyPoly(view);
     EditorModeSelectPoly(view);
+    EditorModeClipping(view);
 }
 
 void RenderSideView(View *view)

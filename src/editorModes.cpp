@@ -204,6 +204,81 @@ bool MouseInControlPoint(View *view, Vec2 rect)
     return false;
 }
 
+
+void EditorModeClipping(View *view)
+{
+    if(gCurrentEditorMode != EDITOR_MODE_CLIPPING)
+        return;
+
+    ViewOrthoState *state = &view->orthoState;
+
+    i32 selectedPoly = gSharedMemory.selectedPolygon;
+    Poly2DStorage *viewStorage = ViewGetPoly2DStorage(view);
+
+    if(selectedPoly < 0 || selectedPoly >= ARRAY_LENGTH(viewStorage->polygons))
+        return;
+
+    if(!MouseIsHot(view))
+        return;
+
+    Poly2D *poly = viewStorage->polygons + selectedPoly;
+
+    i32 mouseRelX = MouseRelX(view);
+    i32 mouseRelY = MouseRelY(view);
+
+    f32 mouseWorldX, mouseWorldY;
+    ScreenToWorld(mouseRelX, mouseRelY, mouseWorldX, mouseWorldY,
+                  state->offsetX, state->offsetY, state->zoom);
+
+    f32 currentX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
+    f32 currentY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
+
+    if(MouseJustDown(MOUSE_BUTTON_LEFT))
+    {
+        state->leftButtonDown = true;
+        state->startP = {currentX, currentY};
+    }
+
+    if(state->leftButtonDown)
+    {
+        state->endP = {currentX, currentY};
+
+        Vec2 a = state->startP;
+        Vec2 b = state->endP;
+        f32 sax, say, sbx, sby;
+        WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
+        WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
+        DrawLine(sax,  say, -3, sbx,  sby, -3, 0xFF00FF00);
+
+        Vec2 ab = b - a;
+        Vec2 n = Vec2Normalized({ab.y, -ab.x});
+
+        a = a + ab * 0.5f;;
+        b = a + n * gUnitSize;
+        WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
+        WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
+        DrawLine(sax,  say, -3, sbx,  sby, -3, 0xFFFF0000);
+
+    }
+
+    if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown)
+    {
+        state->leftButtonDown = false;
+        state->endP = {currentX, currentY};
+
+        // a function that return the correct plane depending on the view you use to
+        // create the clipping plane
+        Plane clipPlane = state->createViewClipPlane(state->startP, state->endP);
+
+        ViewClipPolyVertex(selectedPoly, clipPlane);
+        // printf("plane x: %f y: %f z: %f d: %f\n", clipPlane.n.x, clipPlane.n.y, clipPlane.n.z, clipPlane.d);
+    }
+
+
+
+
+}
+
 void EditorModeModifyPoly(View *view)
 {
     if(gCurrentEditorMode != EDITOR_MODE_MODIFY_POLY)
@@ -528,7 +603,7 @@ i32 MousePicking3D(View *view)
     i32 hitIndex = -1;
     for(i32 i = 0; i < viewStorage->polygonsCount; ++i)
     {
-        PolyPlane *poly = viewStorage->polygons + i;
+        PolyPlane *poly = viewStorage->polyPlanes + i;
         f32 t = -1.0f;
         if(RayHitPolyPlane(ray, poly, &t))
         {
@@ -559,6 +634,7 @@ void EditorModeSelectPoly(View *view)
     }
 }
 
+// TODO: ...
 void EditorModeSetTexture(View *view)
 {
     if(gCurrentEditorMode != EDITOR_MODE_SET_TEXTURE)
@@ -568,12 +644,6 @@ void EditorModeSetTexture(View *view)
     {
         i32 clickPolygon = view->mousePicking(view);
         printf("change texture of the polygon: %d\n", clickPolygon);
-
-
         PolyPlaneStorage *viewStorage = &gSharedMemory.polyPlaneStorage; 
-        
-
-
     }
-
 }

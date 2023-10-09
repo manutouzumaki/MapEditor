@@ -40,6 +40,7 @@ void RenderImGui()
     ImGui::RadioButton("Modify Poly", &(i32)gCurrentEditorMode, EDITOR_MODE_MODIFY_POLY);
     ImGui::RadioButton("Move 3D Camera", &(i32)gCurrentEditorMode, EDITOR_MODE_MOVE_3D_CAMERA);
     ImGui::RadioButton("Set Texture", &(i32)gCurrentEditorMode, EDITOR_MODE_SET_TEXTURE);
+    ImGui::RadioButton("Clipping", &(i32)gCurrentEditorMode, EDITOR_MODE_CLIPPING);
 
     ImGui::Text("Textures:");
 

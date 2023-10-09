@@ -6,6 +6,7 @@ typedef void (*RenderFNP) (View *view);
 
 typedef void (*AddOtherViewsPolysFNP) (Vec2 start, Vec2 end, u32 color);
 typedef void (*UpdateOtherViewsPolysFNP) (RectMinMax rect, i32 quadIndex, u32 color);
+typedef Plane (*CreateViewClipPlaneFNP) (Vec2 a, Vec2 b);
 
 typedef i32 (*MousePickingFNP) (View *view);
 
@@ -67,6 +68,7 @@ struct ViewOrthoState
     RectMinMax rect;
     AddOtherViewsPolysFNP addOtherViewsPolys;
     UpdateOtherViewsPolysFNP updateOtherViewsPolys;
+    CreateViewClipPlaneFNP createViewClipPlane;
 
 };
 
@@ -347,11 +349,11 @@ static Vec3 GetCenterOfPolygon(Poly3D *polygon)
     return center;
 }
 
-
-void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
+PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
 {
-    Poly3D *polygons = (Poly3D *)malloc(poly->planesCount * sizeof(Poly3D));
-    memset(polygons, 0, poly->planesCount * sizeof(Poly3D));
+    PolyVertex polyVertex{};
+    polyVertex.polygonsCount = poly->planesCount;
+
     for(i32 i = 0; i < poly->planesCount - 2; ++i) {
     for(i32 j = i; j < poly->planesCount - 1; ++j) {
     for(i32 k = j; k < poly->planesCount - 0; ++k) {
@@ -380,12 +382,12 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
                 if(illegal == false)
                 {
                     // TODO: add the vertex
-                    Vertex iVert = vertex; iVert.normal = poly->planes[i].n;// * -1.0f;
-                    Vertex jVert = vertex; jVert.normal = poly->planes[j].n;// * -1.0f;
-                    Vertex kVert = vertex; kVert.normal = poly->planes[k].n;// * -1.0f;
-                    polygons[i].vertices[polygons[i].verticesCount++] = iVert;
-                    polygons[j].vertices[polygons[j].verticesCount++] = jVert;
-                    polygons[k].vertices[polygons[k].verticesCount++] = kVert;
+                    Vertex iVert = vertex; iVert.normal = poly->planes[i].n;
+                    Vertex jVert = vertex; jVert.normal = poly->planes[j].n;
+                    Vertex kVert = vertex; kVert.normal = poly->planes[k].n;
+                    polyVertex.polygons[i].vertices[polyVertex.polygons[i].verticesCount++] = iVert;
+                    polyVertex.polygons[j].vertices[polyVertex.polygons[j].verticesCount++] = jVert;
+                    polyVertex.polygons[k].vertices[polyVertex.polygons[k].verticesCount++] = kVert;
                 }
             }
         }
@@ -400,7 +402,7 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
         TextureAxisNormal texAxis = poly->axisNormals[i];
         u32 texture = poly->textures[i];
 
-        Poly3D *polyD = &polygons[i];
+        Poly3D *polyD = &polyVertex.polygons[i];
         Vec3 center = GetCenterOfPolygon(polyD);
         for(i32 j = 0; j < polyD->verticesCount; ++j)
         {
@@ -436,21 +438,13 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
             polyD->vertices[j].uv = { u*xDim, v*yDim };
 
         }
-
-        for(i32 j = 0; j < polyD->verticesCount; ++j)
-        {
-            Vertex vertex = polyD->vertices[j];
-            Mat4 scaleMat = Mat4Scale(1.0f/g3DScale, 1.0f/g3DScale, 1.0f/g3DScale);
-            vertex.position = Mat4TransformPoint(scaleMat, vertex.position);
-            polyD->vertices[j].position = vertex.position;
-        }
     }
 
     // order the vertices in the polygons
     for(i32 p = 0; p < poly->planesCount; ++p)
     {
         Plane polygonPlane = poly->planes[p]; 
-        Poly3D *polygon = polygons + p;
+        Poly3D *polygon = polyVertex.polygons + p;
 
         ASSERT(polygon->verticesCount >= 3);
 
@@ -490,16 +484,28 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
         }
     }
 
+    return polyVertex;
+}
+
+void PushPolyVertexToVertexBuffer(PolyVertex *poly)
+{
     Vertex *vertices = 0;
     
-    for(i32 i = 0; i < poly->planesCount; ++i)
+    for(i32 i = 0; i < poly->polygonsCount; ++i)
     {
-        Poly3D *polyD = &polygons[i];
+        Poly3D *polyD = &poly->polygons[i];
         for(i32 j = 0; j < polyD->verticesCount - 2; ++j)
         {
             Vertex a = polyD->vertices[0];
             Vertex b = polyD->vertices[j + 1];
             Vertex c = polyD->vertices[j + 2];
+
+            // scale down for rendering
+            Mat4 scaleMat = Mat4Scale(1.0f/g3DScale, 1.0f/g3DScale, 1.0f/g3DScale);
+            a.position = Mat4TransformPoint(scaleMat, a.position);
+            b.position = Mat4TransformPoint(scaleMat, b.position);
+            c.position = Mat4TransformPoint(scaleMat, c.position);
+            
             DarrayPush(vertices, a, Vertex);
             DarrayPush(vertices, b, Vertex);
             DarrayPush(vertices, c, Vertex);
@@ -514,7 +520,6 @@ void PushPolyPlaneToVertexBuffer(PolyPlane *poly)
     PushToGPUDynamicVertexBuffer(&gDynamicVertexBuffer);
 
     DarrayDestroy(vertices);
-    free(polygons);
 }
 
 // TODO: remplace this function for a generic polygon function
@@ -537,15 +542,121 @@ PolyPlane CreatePolyPlane(Vec2 xMinMax, Vec2 yMinMax, Vec2 zMinMax)
     poly.axisNormals[4] = { { 1,  0, 0}, {0, -1, 0} };
     poly.axisNormals[5] = { { 1,  0, 0}, {0, -1, 0} };
 
-    poly.textures[0] = gCurrentTexture;
-    poly.textures[1] = gCurrentTexture;
-    poly.textures[2] = gCurrentTexture;
-    poly.textures[3] = gCurrentTexture;
-    poly.textures[4] = gCurrentTexture;
-    poly.textures[5] = gCurrentTexture;
-
     poly.planesCount = 6;
     return poly;
+}
+
+PointToPlane ClassifyPointToPlane(Vec3 p, Plane plane)
+{
+    f32 dist = Vec3Dot(plane.n, p) - plane.d;
+    if(dist > FLT_EPSILON)
+        return POINT_IN_FRONT_OF_PLANE;
+    if(dist < -FLT_EPSILON)
+        return POINT_BEHIND_PLANE;
+    return POINT_ON_PLANE;
+}
+
+PolyToPlane ClassifyPolygonToPlane(Poly3D *poly, Plane plane)
+{
+    i32 numInFront = 0, numBehind = 0;
+    i32 numVerts = poly->verticesCount;
+    for(i32 i = 0; i < numVerts; ++i)
+    {
+        Vec3 p = poly->vertices[i].position;
+        switch(ClassifyPointToPlane(p, plane))
+        {
+            case POINT_IN_FRONT_OF_PLANE:
+            {
+                numInFront++;
+                break;
+            }
+            case POINT_BEHIND_PLANE:
+            {
+                numBehind++;
+                break;
+            }
+        }
+    }
+
+    if(numBehind != 0 && numInFront != 0)
+        return POLYGON_STRADDLING_PLANE;
+    if(numInFront != 0)
+        return POLYGON_IN_FRONT_OF_PLANE;
+    if(numBehind != 0)
+        return POLYGON_BEHIND_PLANE;
+    return POLYGON_COPLANAR_WITH_PLANE;
+}
+
+void IntersectSegmentPlane(Vec3 a, Vec3 b, Plane p, f32 &t)
+{
+    Vec3 ab = b - a;
+    f32 posibleT = (p.d - Vec3Dot(p.n, a)) / Vec3Dot(p.n, ab);
+    if(posibleT >= 0.0f && posibleT <= 1.0f)
+    {
+        t = posibleT;
+    }
+}
+
+Vertex ClipSegmentToPlane(Vertex a, Vertex b, Plane plane)
+{
+    f32 t = -1.0f;
+    IntersectSegmentPlane(a.position, b.position, plane, t);
+    Vertex i;
+    i.position = a.position + (b.position - a.position) * t;
+    i.normal = a.normal + (b.normal - a.normal) * t;
+    i.uv = a.uv + (b.uv - a.uv) * t;
+    i.color = a.color;
+    i.texture = a.texture;
+    return i;
+}
+
+void ViewClipPolyVertex(i32 index, Plane clipPlane)
+{
+    // Clip the polyVert with the clip plane
+    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
+    PolyVertex *polyVert = polyPlaneStorage->polyVerts + index;
+    PolyPlane *polyPlane = polyPlaneStorage->polyPlanes + index;
+
+    i32 planesToRemove[256] = {};
+    for(i32 i = 0; i < polyVert->polygonsCount; ++i)
+    {
+        Poly3D *poly = polyVert->polygons + i;
+
+        if(ClassifyPolygonToPlane(poly, clipPlane) == POLYGON_IN_FRONT_OF_PLANE)
+        {
+            planesToRemove[i] = 1;
+        }
+    }
+
+    PolyPlane newPolyPlane = {};
+
+    for(i32 i = 0; i < polyPlane->planesCount; ++i)
+    {
+        if(planesToRemove[i] == 0)
+        {
+            newPolyPlane.planes[newPolyPlane.planesCount] = polyPlane->planes[i];
+            newPolyPlane.axisNormals[newPolyPlane.planesCount] = polyPlane->axisNormals[i];
+            newPolyPlane.textures[newPolyPlane.planesCount] = polyPlane->textures[i];
+            newPolyPlane.planesCount++;
+        }
+    }
+
+    // TODO: fix this polyPlane axisNormal;
+    newPolyPlane.planes[newPolyPlane.planesCount]      = clipPlane;
+    newPolyPlane.axisNormals[newPolyPlane.planesCount] =  { { 0,  0, 1}, {0, -1, 0} };
+    newPolyPlane.textures[newPolyPlane.planesCount]    = newPolyPlane.textures[0];
+    newPolyPlane.planesCount++;
+
+    *polyPlane = newPolyPlane;
+    *polyVert = CreatePolyVertexFromPolyPlane(polyPlane);
+
+    // reload the dynamic vertex buffer
+    gDynamicVertexBuffer.used = 0;
+    gDynamicVertexBuffer.verticesCount = 0;
+    for(i32 i = 0; i < polyPlaneStorage->polygonsCount; ++i)
+    {
+        PushPolyVertexToVertexBuffer(polyPlaneStorage->polyVerts + i);
+    }
 }
 
 void ViewUpdatePolyPlane(i32 index)
@@ -553,8 +664,6 @@ void ViewUpdatePolyPlane(i32 index)
     PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
     Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
     Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
-
-    ASSERT(polyPlaneStorage->polygonsCount < ARRAY_LENGTH(polyPlaneStorage->polygons));
 
     Poly2D *front = frontStorage->polygons + index;
     Poly2D *side  = sideStorage->polygons  + index;
@@ -599,14 +708,23 @@ void ViewUpdatePolyPlane(i32 index)
     }
 
     PolyPlane poly = CreatePolyPlane(xDim, yDim, zDim);
-    polyPlaneStorage->polygons[index] = poly;
+
+    poly.textures[0] = polyPlaneStorage->polyPlanes[index].textures[0];
+    poly.textures[1] = polyPlaneStorage->polyPlanes[index].textures[1];
+    poly.textures[2] = polyPlaneStorage->polyPlanes[index].textures[2];
+    poly.textures[3] = polyPlaneStorage->polyPlanes[index].textures[3];
+    poly.textures[4] = polyPlaneStorage->polyPlanes[index].textures[4];
+    poly.textures[5] = polyPlaneStorage->polyPlanes[index].textures[5];
+
+    polyPlaneStorage->polyPlanes[index] = poly;
+    polyPlaneStorage->polyVerts[index] = CreatePolyVertexFromPolyPlane(&poly);
 
     // reload the dynamic vertex buffer
     gDynamicVertexBuffer.used = 0;
     gDynamicVertexBuffer.verticesCount = 0;
     for(i32 i = 0; i < polyPlaneStorage->polygonsCount; ++i)
     {
-        PushPolyPlaneToVertexBuffer(polyPlaneStorage->polygons + i);
+        PushPolyVertexToVertexBuffer(polyPlaneStorage->polyVerts + i);
     }
 
 }
@@ -617,7 +735,7 @@ i32 ViewAddPolyPlane()
     Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
     Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
 
-    ASSERT(polyPlaneStorage->polygonsCount < ARRAY_LENGTH(polyPlaneStorage->polygons));
+    ASSERT((polyPlaneStorage->polygonsCount + 1) < ARRAY_LENGTH(polyPlaneStorage->polyPlanes));
     i32 index = polyPlaneStorage->polygonsCount++;
 
     Poly2D *front = frontStorage->polygons + index;
@@ -663,9 +781,15 @@ i32 ViewAddPolyPlane()
     }
 
     PolyPlane poly = CreatePolyPlane(xDim, yDim, zDim);
-    polyPlaneStorage->polygons[index] = poly;
-
-    PushPolyPlaneToVertexBuffer(&poly);
+    poly.textures[0] = gCurrentTexture;
+    poly.textures[1] = gCurrentTexture;
+    poly.textures[2] = gCurrentTexture;
+    poly.textures[3] = gCurrentTexture;
+    poly.textures[4] = gCurrentTexture;
+    poly.textures[5] = gCurrentTexture;
+    polyPlaneStorage->polyPlanes[index] = poly;
+    polyPlaneStorage->polyVerts[index] = CreatePolyVertexFromPolyPlane(&poly);
+    PushPolyVertexToVertexBuffer(polyPlaneStorage->polyVerts + index);
 
     return index;
 }

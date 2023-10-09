@@ -137,37 +137,44 @@ struct TextureAxisNormal
     Vec3 u, v;
 };
 
-struct PolyPlane
-{
-    Plane planes[255];
-    TextureAxisNormal axisNormals[255];
-    u32 textures[255];
-    i32 planesCount;
-};
-
 struct Poly3D
 {
-    Vertex vertices[255];
+    Vertex vertices[64];
     i32 verticesCount;
 };
 
 struct Poly2D
 {
-    Vec2 vertices[255];
+    Vec2 vertices[64];
     i32 verticesCount;
     u32 color;
+};
+
+struct PolyPlane
+{
+    Plane planes[64];
+    TextureAxisNormal axisNormals[64];
+    u32 textures[64];
+    i32 planesCount;
+};
+
+struct PolyVertex
+{
+    Poly3D polygons[64];
+    i32 polygonsCount;
 };
 
 // TODO: use a link list base storage system
 struct Poly2DStorage
 {
-    Poly2D polygons[255];
+    Poly2D polygons[64];
     i32 polygonsCount;
 };
 
 struct PolyPlaneStorage
 {
-    PolyPlane polygons[255];
+    PolyPlane polyPlanes[64];
+    PolyVertex polyVerts[64];
     i32 polygonsCount;
 };
 
@@ -177,6 +184,21 @@ struct SharedMemory
     PolyPlaneStorage polyPlaneStorage;
 
     i32 selectedPolygon = -1;
+};
+
+enum PointToPlane
+{
+    POINT_IN_FRONT_OF_PLANE,
+    POINT_BEHIND_PLANE,
+    POINT_ON_PLANE
+};
+
+enum PolyToPlane
+{
+    POLYGON_IN_FRONT_OF_PLANE,
+    POLYGON_BEHIND_PLANE,
+    POLYGON_STRADDLING_PLANE,
+    POLYGON_COPLANAR_WITH_PLANE
 };
 
 #endif

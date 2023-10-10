@@ -1,51 +1,57 @@
 static void AddFrontAndTopViewsPolys(Vec2 startP, Vec2 endP, u32 color)
 {
-    Poly2D poly;
-
     Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
-    poly.vertices[0] = {0, endP.y};
-    poly.vertices[1] = {gUnitSize, endP.y};
-    poly.vertices[2] = {gUnitSize, startP.y};
-    poly.vertices[3] = {0, startP.y};
-    poly.verticesCount = 4;
+
+    Poly2D poly = {};
+    Vec2 a = {0, endP.y};
+    Vec2 b = {gUnitSize, endP.y};
+    Vec2 c = {gUnitSize, startP.y};
+    Vec2 d = {0, startP.y};
+    DarrayPush(poly.vertices, a, Vec2);
+    DarrayPush(poly.vertices, b, Vec2);
+    DarrayPush(poly.vertices, c, Vec2);
+    DarrayPush(poly.vertices, d, Vec2);
     poly.color = color;
-    ASSERT(frontStorage->polygonsCount < ARRAY_LENGTH(frontStorage->polygons));
-    frontStorage->polygons[frontStorage->polygonsCount++] = poly;
-    
+
+    PolyVertex2D polyVert = {};
+    DarrayPush(polyVert.polygons, poly, Poly2D);
+    DarrayPush(frontStorage->polyVerts, polyVert, PolyVertex2D);
+
     Poly2DStorage *topStorage = gSharedMemory.poly2dStorage + VIEW_TOP;
-    poly.vertices[0] = {0, endP.x};
-    poly.vertices[1] = {gUnitSize, endP.x};
-    poly.vertices[2] = {gUnitSize, startP.x};
-    poly.vertices[3] = {0, startP.x};
-    poly.verticesCount = 4;
+
+    poly = {};
+    a = {0, endP.x};
+    b = {gUnitSize, endP.x};
+    c = {gUnitSize, startP.x};
+    d = {0, startP.x};
+    DarrayPush(poly.vertices, a, Vec2);
+    DarrayPush(poly.vertices, b, Vec2);
+    DarrayPush(poly.vertices, c, Vec2);
+    DarrayPush(poly.vertices, d, Vec2);
     poly.color = color;
-    ASSERT(topStorage->polygonsCount < ARRAY_LENGTH(topStorage->polygons));
-    topStorage->polygons[topStorage->polygonsCount++] = poly;
+
+    polyVert = {};
+    DarrayPush(polyVert.polygons, poly, Poly2D);
+    DarrayPush(topStorage->polyVerts, polyVert, PolyVertex2D);
 }
 
 static void UpdateFrontAndTopViewsPolys(RectMinMax rect, i32 quadIndex, u32 color)
 {
-
     Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT; 
-    Poly2D poly = frontStorage->polygons[quadIndex];
-    poly.vertices[0] = {poly.vertices[0].x, rect.max.y};
-    poly.vertices[1] = {poly.vertices[1].x, rect.max.y};
-    poly.vertices[2] = {poly.vertices[2].x, rect.min.y};
-    poly.vertices[3] = {poly.vertices[3].x, rect.min.y};
-    poly.verticesCount = 4;
-    poly.color = color;
-    frontStorage->polygons[quadIndex] = poly;
+    PolyVertex2D *polyVert = frontStorage->polyVerts + quadIndex;
+    Poly2D *poly = &polyVert->polygons[0];
+    poly->vertices[0] = {poly->vertices[0].x, rect.max.y};
+    poly->vertices[1] = {poly->vertices[1].x, rect.max.y};
+    poly->vertices[2] = {poly->vertices[2].x, rect.min.y};
+    poly->vertices[3] = {poly->vertices[3].x, rect.min.y};
     
-
     Poly2DStorage *topStorage = gSharedMemory.poly2dStorage + VIEW_TOP;
-    poly = topStorage->polygons[quadIndex];
-    poly.vertices[0] = {poly.vertices[0].x, rect.max.x};
-    poly.vertices[1] = {poly.vertices[1].x, rect.max.x};
-    poly.vertices[2] = {poly.vertices[2].x, rect.min.x};
-    poly.vertices[3] = {poly.vertices[3].x, rect.min.x};
-    poly.verticesCount = 4;
-    poly.color = color;
-    topStorage->polygons[quadIndex] = poly;
+    polyVert = topStorage->polyVerts + quadIndex;
+    poly = &polyVert->polygons[0];
+    poly->vertices[0] = {poly->vertices[0].x, rect.max.x};
+    poly->vertices[1] = {poly->vertices[1].x, rect.max.x};
+    poly->vertices[2] = {poly->vertices[2].x, rect.min.x};
+    poly->vertices[3] = {poly->vertices[3].x, rect.min.x};
 }
 
 Plane CreateSideClipPlane(Vec2 a, Vec2 b)
@@ -87,10 +93,10 @@ void RenderSideView(View *view)
     ViewOrthoBaseRender(view);
 
     Poly2DStorage *poly2dStorage = ViewGetPoly2DStorage(view);
-    for(i32 i = 0; i  < poly2dStorage->polygonsCount; ++i)
+    for(i32 i = 0; i  < DarraySize(poly2dStorage->polyVerts); ++i)
     {
-        Poly2D *poly = poly2dStorage->polygons + i;
-        RenderPoly2D(view ,poly, poly->color);
+        PolyVertex2D *polyVert = poly2dStorage->polyVerts + i;
+        RenderPolyVertex2D(view ,polyVert);
     }
     LineRendererDraw();
 }

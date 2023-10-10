@@ -137,6 +137,7 @@ struct TextureAxisNormal
     Vec3 u, v;
 };
 
+// TODO: change this to use a Darray
 struct Poly3D
 {
     Vertex vertices[64];
@@ -145,8 +146,7 @@ struct Poly3D
 
 struct Poly2D
 {
-    Vec2 vertices[64];
-    i32 verticesCount;
+    Vec2 *vertices;
     u32 color;
 };
 
@@ -164,11 +164,15 @@ struct PolyVertex
     i32 polygonsCount;
 };
 
+struct PolyVertex2D
+{
+    Poly2D *polygons;
+};
+
 // TODO: use a link list base storage system
 struct Poly2DStorage
 {
-    Poly2D polygons[64];
-    i32 polygonsCount;
+    PolyVertex2D *polyVerts;
 };
 
 struct PolyPlaneStorage

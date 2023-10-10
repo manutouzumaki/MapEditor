@@ -39,7 +39,7 @@ void DarrayDestroy_(void *array) {
 }
 
 u32 DarraySize_(void *array) {
-    ASSERT(array != NULL);
+    if(array == NULL) return 0;
     return DARRAY_GET_SIZE(array);
     
 }

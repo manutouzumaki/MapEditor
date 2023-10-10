@@ -115,7 +115,7 @@ void EditorModeAddPoly(View *view)
             f32 startX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
             f32 startY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
             state->startP = {startX, startY};
-            state->quadIndex = ViewAddQuad(view, state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize});
+            state->quadIndex = ViewAddPolyVertex2D(view, state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize});
             state->addOtherViewsPolys(state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize}, 0xFFFFFFAA);
         }
         
@@ -130,7 +130,7 @@ void EditorModeAddPoly(View *view)
             state->rect.min.y = Min(state->startP.y, state->endP.y);
             state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
             state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
-            ViewUpdateQuad(view, state->rect.min, state->rect.max, state->quadIndex);
+            ViewUpdatePolyVertex2D(view, state->rect.min, state->rect.max, state->quadIndex);
             state->updateOtherViewsPolys(state->rect, state->quadIndex, 0xFFFFFFAA);
             ViewAddPolyPlane();
             gSharedMemory.selectedPolygon = state->quadIndex;
@@ -149,7 +149,7 @@ void EditorModeAddPoly(View *view)
             state->rect.min.y = Min(state->startP.y, state->endP.y);
             state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
             state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
-            ViewUpdateQuad(view, state->rect.min, state->rect.max, state->quadIndex);
+            ViewUpdatePolyVertex2D(view, state->rect.min, state->rect.max, state->quadIndex);
             state->updateOtherViewsPolys(state->rect, state->quadIndex, 0xFFFFFFAA);
         }
     }
@@ -215,13 +215,11 @@ void EditorModeClipping(View *view)
     i32 selectedPoly = gSharedMemory.selectedPolygon;
     Poly2DStorage *viewStorage = ViewGetPoly2DStorage(view);
 
-    if(selectedPoly < 0 || selectedPoly >= ARRAY_LENGTH(viewStorage->polygons))
+    if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->polyVerts))
         return;
 
     if(!MouseIsHot(view))
         return;
-
-    Poly2D *poly = viewStorage->polygons + selectedPoly;
 
     i32 mouseRelX = MouseRelX(view);
     i32 mouseRelY = MouseRelY(view);
@@ -325,6 +323,7 @@ void EditorModeClipping(View *view)
         // create the clipping plane
         Plane clipPlane = state->createViewClipPlane(state->startP, state->endP);
         ViewClipPolyVertex(selectedPoly, clipPlane);
+        ViewUpdatePolyVertex2DFromPolyPlane(selectedPoly);
     }
 }
 
@@ -342,27 +341,34 @@ void EditorModeModifyPoly(View *view)
     i32 selectedPoly = gSharedMemory.selectedPolygon;
     Poly2DStorage *viewStorage = ViewGetPoly2DStorage(view);
 
-    if(selectedPoly < 0 || selectedPoly >= ARRAY_LENGTH(viewStorage->polygons))
-        return;
 
-    Poly2D *poly = viewStorage->polygons + selectedPoly;
+    if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->polyVerts))
+        return;
 
     // Get Min and Max
     Vec2 xDim = {FLT_MAX, -FLT_MAX}; 
     Vec2 yDim = {FLT_MAX, -FLT_MAX}; 
 
-    for(i32 i = 0; i < poly->verticesCount; ++i)
+    PolyVertex2D *polyVert = viewStorage->polyVerts + selectedPoly;
+    for(i32 j = 0; j < DarraySize(polyVert->polygons); ++j)
     {
-        Vec2 vert = poly->vertices[i];
-        if(vert.x <= xDim.x)
-            xDim.x = vert.x;
-        if(vert.x >= xDim.y)
-            xDim.y = vert.x; 
-        if(vert.y <= yDim.x)
-            yDim.x = vert.y;
-        if(vert.y >= yDim.y)
-            yDim.y = vert.y;
+        Poly2D *poly = polyVert->polygons + j;
+
+        for(i32 i = 0; i < DarraySize(poly->vertices); ++i)
+        {
+            Vec2 vert = poly->vertices[i];
+            if(vert.x <= xDim.x)
+                xDim.x = vert.x;
+            if(vert.x >= xDim.y)
+                xDim.y = vert.x; 
+            if(vert.y <= yDim.x)
+                yDim.x = vert.y;
+            if(vert.y >= yDim.y)
+                yDim.y = vert.y;
+        }
+
     }
+
 
     Vec2 botL = {xDim.x, yDim.x};
     Vec2 botR = {xDim.y, yDim.x};
@@ -500,22 +506,22 @@ void EditorModeModifyPoly(View *view)
         state->rect.min.y = botL.y;
         state->rect.max.x = topR.x;
         state->rect.max.y = topR.y;
-        ViewUpdateQuad(view, state->rect.min, state->rect.max, selectedPoly);
-        state->updateOtherViewsPolys(state->rect, selectedPoly, 0xFFFFFFAA);
-        ViewUpdatePolyPlane(selectedPoly);
+        //ViewUpdateQuad(view, state->rect.min, state->rect.max, selectedPoly);
+        //state->updateOtherViewsPolys(state->rect, selectedPoly, 0xFFFFFFAA);
+        //ViewUpdatePolyPlane(selectedPoly);
     }
 }
 
 bool PointHitPoly2D(Poly2D *poly, f32 x, f32 y, f32 zoom)
 {
     Vec2 mouseP = {x, y};
-    for(i32 i = 0; i < poly->verticesCount; ++i)
+    for(i32 i = 0; i < DarraySize(poly->vertices); ++i)
     {
         if(i == 1)
             i32 stophere = 1;
 
-        Vec2 a = poly->vertices[(i + 0) % poly->verticesCount];
-        Vec2 b = poly->vertices[(i + 1) % poly->verticesCount];
+        Vec2 a = poly->vertices[(i + 0) % DarraySize(poly->vertices)];
+        Vec2 b = poly->vertices[(i + 1) % DarraySize(poly->vertices)];
         Vec2 ab = b - a;
 
         // create the rect orthonormal basis
@@ -555,19 +561,20 @@ i32 MousePicking2D(View *view)
                   state->offsetX, state->offsetY, state->zoom);
 
     Poly2DStorage *viewStorage = ViewGetPoly2DStorage(view);
-
-    // loop over every polygon in the list
-    for(i32 i = 0; i < viewStorage->polygonsCount; ++i)
+    for(i32 j = 0; j < DarraySize(viewStorage->polyVerts); ++j)
     {
-        Poly2D *poly = viewStorage->polygons + i;
-        if(PointHitPoly2D(poly, mouseWorldX, mouseWorldY, state->zoom))
+        PolyVertex2D *polyVert = viewStorage->polyVerts + j;
+        // loop over every polygon in the list
+        for(i32 i = 0; i < DarraySize(polyVert->polygons); ++i)
         {
-            return i;
+            Poly2D *poly = polyVert->polygons + i;
+            if(PointHitPoly2D(poly, mouseWorldX, mouseWorldY, state->zoom))
+            {
+                return j;
+            }
         }
     }
-
     return -1;
-
 }
 
 static Ray GetMouseRay(View *view, f32 x, f32 y) 

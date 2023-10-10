@@ -646,8 +646,81 @@ void ViewClipPolyVertex(i32 index, Plane clipPlane)
     }
 }
 
+void UpdateTopPolyVertex2D(PolyVertex *polyVert, PolyPlane *polyPlane, PolyVertex2D *polyVert2D, Vec3 normal)
+{
+    // TOP:
+    // we need to add to the vertexPoly2D all the face that are not perpendicular to (0, 1, 0)
+    // remove all the old information
+    for(i32 i = 0; i < DarraySize(polyVert2D->polygons); ++i)
+    {
+        Poly2D *poly = polyVert2D->polygons + i;
+        DarrayDestroy(poly->vertices);
+    }
+    DarrayDestroy(polyVert2D->polygons);
+    polyVert2D->polygons = 0;
+    
+    i32 *facesToAdd = 0;
+    for(i32 i = 0; i < polyPlane->planesCount; ++i)
+    {
+        Plane p = polyPlane->planes[i];
+        f32 dot = Vec3Dot(p.n, normal);
+        if(dot >= FLT_EPSILON || dot <= -FLT_EPSILON)
+        {
+            DarrayPush(facesToAdd, i, i32);
+        }
+    }
+
+    for(i32 i = 0; i < DarraySize(facesToAdd); ++i)
+    {
+        i32 faceIndex = facesToAdd[i];
+        Poly3D *poly3D = polyVert->polygons + faceIndex;
+        Poly2D poly2D = {};
+        poly2D.color = 0xFFFFFFAA;
+        for(i32 j = 0; j < poly3D->verticesCount; ++j)
+        {
+            Vertex vertex = poly3D->vertices[j];
+            Vec2 vertice = {};
+
+            if(normal.x != 0.0f)
+                vertice = {vertex.position.z, vertex.position.y};
+
+            if(normal.y != 0.0f)
+                vertice = {vertex.position.x, vertex.position.z};
+
+            if(normal.z != 0.0f)
+                vertice = {vertex.position.x, vertex.position.y};  
+
+            DarrayPush(poly2D.vertices, vertice, Vec2);
+        }
+        DarrayPush(polyVert2D->polygons, poly2D, Poly2D);
+    }
+
+    DarrayDestroy(facesToAdd);
+}
+
+void ViewUpdatePolyVertex2DFromPolyPlane(i32 index)
+{
+    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
+    Poly2DStorage *topStorage = gSharedMemory.poly2dStorage + VIEW_TOP;
+    Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
+    Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
+
+    // src (where we get the data from)
+    PolyVertex   *polyVert    = polyPlaneStorage->polyVerts  + index;
+    PolyPlane    *polyPlane   = polyPlaneStorage->polyPlanes + index;
+    // dst (what we need to modify with the data we get)
+    PolyVertex2D *topVert2D   = topStorage->polyVerts        + index;
+    PolyVertex2D *frontVert2D = frontStorage->polyVerts      + index;
+    PolyVertex2D *sideVert2D  = sideStorage->polyVerts       + index;
+
+    UpdateTopPolyVertex2D(polyVert, polyPlane, topVert2D, {0, 1, 0});
+    UpdateTopPolyVertex2D(polyVert, polyPlane, frontVert2D, {0, 0, 1});
+    UpdateTopPolyVertex2D(polyVert, polyPlane, sideVert2D, {1, 0, 0});
+}
+
 void ViewUpdatePolyPlane(i32 index)
 {
+    /*
     PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
     Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
     Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
@@ -713,7 +786,7 @@ void ViewUpdatePolyPlane(i32 index)
     {
         PushPolyVertexToVertexBuffer(polyPlaneStorage->polyVerts + i);
     }
-
+    */
 }
 
 i32 ViewAddPolyPlane()
@@ -725,14 +798,17 @@ i32 ViewAddPolyPlane()
     ASSERT((polyPlaneStorage->polygonsCount + 1) < ARRAY_LENGTH(polyPlaneStorage->polyPlanes));
     i32 index = polyPlaneStorage->polygonsCount++;
 
-    Poly2D *front = frontStorage->polygons + index;
-    Poly2D *side  = sideStorage->polygons  + index;
+    PolyVertex2D *frontVert = frontStorage->polyVerts + index;
+    PolyVertex2D *sideVert  = sideStorage->polyVerts  + index;
+
+    Poly2D *front = &frontVert->polygons[0]; 
+    Poly2D *side = &sideVert->polygons[0]; 
 
     Vec2 xDim = {FLT_MAX, -FLT_MAX}; 
     Vec2 yDim = {FLT_MAX, -FLT_MAX}; 
     Vec2 zDim = {FLT_MAX, -FLT_MAX};
 
-    for(i32 i = 0; i < front->verticesCount; ++i)
+    for(i32 i = 0; i < DarraySize(front->vertices); ++i)
     {
         Vec2 vertice = front->vertices[i];
         if(vertice.x <= xDim.x)
@@ -754,7 +830,7 @@ i32 ViewAddPolyPlane()
         }
     }
 
-    for(i32 i = 0; i < side->verticesCount; ++i)
+    for(i32 i = 0; i < DarraySize(side->vertices); ++i)
     {
         Vec2 vertice = side->vertices[i];
         if(vertice.x <= zDim.x)
@@ -781,61 +857,80 @@ i32 ViewAddPolyPlane()
     return index;
 }
 
-i32 ViewAddQuad(View *view, Vec2 start, Vec2 end)
+// TODO: IMPORTANT dont forget to free this
+i32 ViewAddPolyVertex2D(View *view, Vec2 start, Vec2 end)
 {
     Poly2DStorage *poly2dStorage = ViewGetPoly2DStorage(view);
 
-    Poly2D poly;
-    poly.vertices[0] = {start.x, start.y};
-    poly.vertices[1] = {end.x, start.y};
-    poly.vertices[2] = {end.x, end.y};
-    poly.vertices[3] = {start.x, end.y};
-    poly.verticesCount = 4;
+    Poly2D poly = {};
+    
+    Vec2 a = {start.x, start.y};
+    Vec2 b = {end.x,   start.y};
+    Vec2 c = {end.x,   end.y}; 
+    Vec2 d = {start.x, end.y};
+
+    DarrayPush(poly.vertices, a, Vec2);
+    DarrayPush(poly.vertices, b, Vec2);
+    DarrayPush(poly.vertices, c, Vec2);
+    DarrayPush(poly.vertices, d, Vec2);
+
     poly.color = 0xFFFFFFAA;
 
-    ASSERT(poly2dStorage->polygonsCount < ARRAY_LENGTH(poly2dStorage->polygons));
-    i32 index = poly2dStorage->polygonsCount++;
-    poly2dStorage->polygons[index] = poly;
+    PolyVertex2D polyVert = {};
+    DarrayPush(polyVert.polygons, poly, Poly2D);
+    DarrayPush(poly2dStorage->polyVerts, polyVert, PolyVertex2D);
+
+    i32 index = DarraySize(poly2dStorage->polyVerts) - 1;
 
     return index;
 }
 
-void ViewUpdateQuad(View *view, Vec2 start, Vec2 end, i32 index)
+// TODO: mabye change the name of this function (this is only use when we add more brushes)
+void ViewUpdatePolyVertex2D(View *view, Vec2 start, Vec2 end, i32 index)
 {
     Poly2DStorage *poly2dStorage = ViewGetPoly2DStorage(view);
 
-    Poly2D poly;
-    poly.vertices[0] = {start.x, start.y};
-    poly.vertices[1] = {end.x, start.y};
-    poly.vertices[2] = {end.x, end.y};
-    poly.vertices[3] = {start.x, end.y};
-    poly.verticesCount = 4;
-    poly.color = 0xFFFFFFAA;
+    PolyVertex2D *polyVert = poly2dStorage->polyVerts + index;
 
-    poly2dStorage->polygons[index] = poly;
+    Poly2D *poly = &polyVert->polygons[0];
+
+    // TODO: fix this
+    ASSERT(DarraySize(poly->vertices) >= 4);
+
+    poly->vertices[0] = {start.x, start.y};
+    poly->vertices[1] = {end.x, start.y};
+    poly->vertices[2] = {end.x, end.y};
+    poly->vertices[3] = {start.x, end.y};
+    poly->color = 0xFFFFFFAA;
 }
 
-void RenderPoly2D(View *view, Poly2D *poly, u32 color)
+void RenderPolyVertex2D(View *view, PolyVertex2D *polyVert)
 {
     ViewOrthoState *state = &view->orthoState;
-    for(i32 i = 0; i < poly->verticesCount - 1; ++i)
-    {
-        Vec2 a = poly->vertices[i + 0];
-        Vec2 b = poly->vertices[i + 1];
 
+    for(i32 j = 0; j < DarraySize(polyVert->polygons); ++j)
+    {
+        Poly2D *poly = polyVert->polygons + j;
+        u32 color = poly->color;
+        for(i32 i = 0; i < DarraySize(poly->vertices) - 1; ++i)
+        {
+            Vec2 a = poly->vertices[i + 0];
+            Vec2 b = poly->vertices[i + 1];
+
+            f32 sax, say, sbx, sby;
+            WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
+            WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
+
+            DrawLine(sax,  say, -2, sbx,  sby, -2, color);
+        }
+
+        Vec2 a = poly->vertices[DarraySize(poly->vertices) - 1];
+        Vec2 b = poly->vertices[0];
         f32 sax, say, sbx, sby;
         WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
         WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
-
         DrawLine(sax,  say, -2, sbx,  sby, -2, color);
     }
-
-    Vec2 a = poly->vertices[poly->verticesCount - 1];
-    Vec2 b = poly->vertices[0];
-    f32 sax, say, sbx, sby;
-    WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
-    WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
-    DrawLine(sax,  say, -2, sbx,  sby, -2, color);
 }
 
 

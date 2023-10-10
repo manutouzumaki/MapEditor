@@ -218,6 +218,9 @@ void EditorModeClipping(View *view)
     if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->polyVerts))
         return;
 
+    PolyVertex2D *polyVert = viewStorage->polyVerts + selectedPoly;
+    RenderPolyVertex2DColor(view , polyVert, 0xFF0000FF);
+
     if(!MouseIsHot(view))
         return;
 

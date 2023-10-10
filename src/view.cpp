@@ -933,6 +933,34 @@ void RenderPolyVertex2D(View *view, PolyVertex2D *polyVert)
     }
 }
 
+void RenderPolyVertex2DColor(View *view, PolyVertex2D *polyVert, u32 color)
+{
+    ViewOrthoState *state = &view->orthoState;
+
+    for(i32 j = 0; j < DarraySize(polyVert->polygons); ++j)
+    {
+        Poly2D *poly = polyVert->polygons + j;
+        for(i32 i = 0; i < DarraySize(poly->vertices) - 1; ++i)
+        {
+            Vec2 a = poly->vertices[i + 0];
+            Vec2 b = poly->vertices[i + 1];
+
+            f32 sax, say, sbx, sby;
+            WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
+            WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
+
+            DrawLine(sax,  say, -2, sbx,  sby, -2, color);
+        }
+
+        Vec2 a = poly->vertices[DarraySize(poly->vertices) - 1];
+        Vec2 b = poly->vertices[0];
+        f32 sax, say, sbx, sby;
+        WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
+        WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
+        DrawLine(sax,  say, -2, sbx,  sby, -2, color);
+    }
+}
+
 
 void ViewOrthoBaseSetup(View *view)
 {

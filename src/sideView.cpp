@@ -67,6 +67,7 @@ void SetupSideView(View *view)
     state->updateOtherViewsPolys = UpdateFrontAndTopViewsPolys;
     state->createViewClipPlane = CreateSideClipPlane;
     state->controlPointDown = -1;
+    state->planeCreated = false;
     view->mousePicking = MousePicking2D;
 }
 

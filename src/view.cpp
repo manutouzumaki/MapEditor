@@ -61,6 +61,7 @@ struct ViewOrthoState
     bool rightButtonDown;
 
     i32 controlPointDown;
+    bool planeCreated;
 
     Vec2 startP;
     Vec2 endP;
@@ -587,29 +588,6 @@ PolyToPlane ClassifyPolygonToPlane(Poly3D *poly, Plane plane)
     return POLYGON_COPLANAR_WITH_PLANE;
 }
 
-void IntersectSegmentPlane(Vec3 a, Vec3 b, Plane p, f32 &t)
-{
-    Vec3 ab = b - a;
-    f32 posibleT = (p.d - Vec3Dot(p.n, a)) / Vec3Dot(p.n, ab);
-    if(posibleT >= 0.0f && posibleT <= 1.0f)
-    {
-        t = posibleT;
-    }
-}
-
-Vertex ClipSegmentToPlane(Vertex a, Vertex b, Plane plane)
-{
-    f32 t = -1.0f;
-    IntersectSegmentPlane(a.position, b.position, plane, t);
-    Vertex i;
-    i.position = a.position + (b.position - a.position) * t;
-    i.normal = a.normal + (b.normal - a.normal) * t;
-    i.uv = a.uv + (b.uv - a.uv) * t;
-    i.color = a.color;
-    i.texture = a.texture;
-    return i;
-}
-
 void ViewClipPolyVertex(i32 index, Plane clipPlane)
 {
     // Clip the polyVert with the clip plane
@@ -617,14 +595,19 @@ void ViewClipPolyVertex(i32 index, Plane clipPlane)
     PolyVertex *polyVert = polyPlaneStorage->polyVerts + index;
     PolyPlane *polyPlane = polyPlaneStorage->polyPlanes + index;
 
-    i32 planesToRemove[256] = {};
+    // Remove invalid planes
+    i32 *planesToRemove = 0;
     for(i32 i = 0; i < polyVert->polygonsCount; ++i)
     {
         Poly3D *poly = polyVert->polygons + i;
 
         if(ClassifyPolygonToPlane(poly, clipPlane) == POLYGON_IN_FRONT_OF_PLANE)
         {
-            planesToRemove[i] = 1;
+            DarrayPush(planesToRemove, 1, i32);
+        }
+        else
+        {   
+            DarrayPush(planesToRemove, 0, i32);
         }
     }
 
@@ -641,12 +624,16 @@ void ViewClipPolyVertex(i32 index, Plane clipPlane)
         }
     }
 
+    DarrayDestroy(planesToRemove);
+
+    // Add the new clipPlane
     // TODO: fix this polyPlane axisNormal;
     newPolyPlane.planes[newPolyPlane.planesCount]      = clipPlane;
     newPolyPlane.axisNormals[newPolyPlane.planesCount] =  { { 0,  0, 1}, {0, -1, 0} };
     newPolyPlane.textures[newPolyPlane.planesCount]    = newPolyPlane.textures[0];
     newPolyPlane.planesCount++;
 
+    // TODO: we probably will have to change this
     *polyPlane = newPolyPlane;
     *polyVert = CreatePolyVertexFromPolyPlane(polyPlane);
 

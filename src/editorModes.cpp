@@ -230,18 +230,18 @@ void EditorModeClipping(View *view)
     ScreenToWorld(mouseRelX, mouseRelY, mouseWorldX, mouseWorldY,
                   state->offsetX, state->offsetY, state->zoom);
 
-    f32 currentX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
-    f32 currentY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
+    f32 currentX = floorf((mouseWorldX + gUnitSize/2) / gUnitSize) * gUnitSize;
+    f32 currentY = floorf((mouseWorldY + gUnitSize/2) / gUnitSize) * gUnitSize;
 
-    if(MouseJustDown(MOUSE_BUTTON_LEFT))
+    if(MouseJustDown(MOUSE_BUTTON_LEFT) && state->planeCreated == false)
     {
         state->leftButtonDown = true;
         state->startP = {currentX, currentY};
     }
 
-    if(state->leftButtonDown)
+    if(state->leftButtonDown || state->planeCreated)
     {
-        state->endP = {currentX, currentY};
+        if(state->planeCreated == false) state->endP = {currentX, currentY};
 
         Vec2 a = state->startP;
         Vec2 b = state->endP;
@@ -258,25 +258,74 @@ void EditorModeClipping(View *view)
         WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
         WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
         DrawLine(sax,  say, -3, sbx,  sby, -3, 0xFFFF0000);
-
     }
 
-    if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown)
+    if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown && state->planeCreated == false)
     {
         state->leftButtonDown = false;
+        state->planeCreated = true;
         state->endP = {currentX, currentY};
+    }
 
+    if(state->planeCreated == true)
+    {
+        Vec2 a = state->startP;
+        Vec2 b = state->endP;
+
+        // Draw control points
+        Vec2 u = {0,4*(1.0f/state->zoom)};
+        Vec2 r = {4*(1.0f/state->zoom),0};
+
+        RectVert quads[2];
+        quads[0] = { a-r-u, a+r-u, a-r+u, a+r+u };
+        quads[1] = { b-r-u, b+r-u, b-r+u, b+r+u };
+
+        Vec2 controlP[2] {
+            state->startP, state->endP
+        };
+        
+        for(i32 i = 0; i < 2; ++i)
+        {
+            u32 color = 0xFF2222FF;
+            if(MouseInControlPoint(view, controlP[i]))
+            {
+                color = 0xFFFFFF00;
+                if(MouseJustDown(MOUSE_BUTTON_LEFT))
+                {
+                    state->leftButtonDown = true;
+                    state->controlPointDown = i;
+                }
+            }
+            Draw2DQuad(state, quads[i].a, quads[i].b, quads[i].c, quads[i].d, color, -4.0f);
+        }
+
+        if(state->leftButtonDown)
+        {
+            if(state->controlPointDown == 0)
+            {
+                state->startP = {currentX, currentY};
+            }
+            else
+            {
+                state->endP = {currentX, currentY};
+            }
+        }
+
+        if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown)
+        {
+            state->leftButtonDown = false;
+            state->controlPointDown = -1;
+        }
+    }
+
+    // TODO: change this to use the Enter key
+    if(MouseJustDown(MOUSE_BUTTON_RIGHT) && state->planeCreated == true)
+    {
         // a function that return the correct plane depending on the view you use to
         // create the clipping plane
         Plane clipPlane = state->createViewClipPlane(state->startP, state->endP);
-
         ViewClipPolyVertex(selectedPoly, clipPlane);
-        // printf("plane x: %f y: %f z: %f d: %f\n", clipPlane.n.x, clipPlane.n.y, clipPlane.n.z, clipPlane.d);
     }
-
-
-
-
 }
 
 void EditorModeModifyPoly(View *view)

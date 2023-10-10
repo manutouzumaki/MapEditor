@@ -65,6 +65,7 @@ void SetupFrontView(View *view)
     state->updateOtherViewsPolys = UpdateSideAndTopViewsPolys;
     state->createViewClipPlane = CreateFrontClipPlane;
     state->controlPointDown = -1;
+    state->planeCreated = false;
     view->mousePicking = MousePicking2D;
 }
 

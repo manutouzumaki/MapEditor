@@ -63,6 +63,7 @@ void SetupTopView(View *view)
     state->updateOtherViewsPolys = UpdateFrontAndSideViewsPolys;
     state->createViewClipPlane = CreateTopClipPlane;
     state->controlPointDown = -1;
+    state->planeCreated = false;
     view->mousePicking = MousePicking2D;
 }
 

@@ -350,6 +350,16 @@ static Vec3 GetCenterOfPolygon(Poly3D *polygon)
     return center;
 }
 
+
+void RemoveVertexAtIndex(Poly3D *poly, i32 index)
+{
+    for(i32 i = index; i < (poly->verticesCount - 1); ++i)
+    {
+        poly->vertices[i] = poly->vertices[i + 1];
+    }
+    poly->verticesCount--;
+}
+
 PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
 {
     PolyVertex polyVertex{};
@@ -361,9 +371,6 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
 
         if(i != j && i != k && j != k)
         {
-            poly->planes[i].n = Vec3Normalized(poly->planes[i].n);
-            poly->planes[j].n = Vec3Normalized(poly->planes[j].n);
-            poly->planes[k].n = Vec3Normalized(poly->planes[k].n);
             Plane a = poly->planes[i];
             Plane b = poly->planes[j];
             Plane c = poly->planes[k];
@@ -466,7 +473,7 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
             for(i32 m = n + 1; m <= polygon->verticesCount - 1; ++m)
             {
                 Vertex vertex = polygon->vertices[m];
-                if((Vec3Dot(p.n, vertex.position) - p.d) > 0.0f)
+                if((Vec3Dot(p.n, vertex.position) - p.d) > EPSILON)
                 {
                     Vec3 b = Vec3Normalized(vertex.position - center);
                     f32 angle = Vec3Dot(a, b);
@@ -483,6 +490,29 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
                 Vertex tmp = polygon->vertices[n + 1];
                 polygon->vertices[n + 1] = polygon->vertices[smallest];
                 polygon->vertices[smallest] = tmp;
+            }
+        }
+    }
+
+    // remove repeted vertex
+    for(i32 j = 0; j < polyVertex.polygonsCount; ++j)
+    {
+        Poly3D *poly = polyVertex.polygons + j;
+        for(i32 i = 0; i < poly->verticesCount; ++i)
+        {
+            Vertex a = poly->vertices[i];
+            for(i32 k = 0; k < poly->verticesCount; ++k)
+            {
+                Vertex b = poly->vertices[k];
+                if(i != k)
+                {
+                    // remove the vertex
+                    if(a.position == b.position)
+                    {
+                        RemoveVertexAtIndex(poly, k);
+                        k--;
+                    }
+                }
             }
         }
     }

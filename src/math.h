@@ -4,13 +4,12 @@
 #include <math.h>
 
 #define EPSILON 0.0001f
-#define VEC_EPSILON FLT_EPSILON
 #define BSP_EPSILON 0
 #define PI 3.14159265359
 #define TO_RAD(value) ((value/180.0f) * PI)
 #define TO_DEG(value) ((value/PI) * 180.0f)
 
-//#define VEC_EPSILON 0.000001f
+#define VEC_EPSILON 0.000001f
 #define MAT_EPSILON 0.000001f
 
 f32 Min(f32 a, f32 b)

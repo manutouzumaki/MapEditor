@@ -361,6 +361,9 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
 
         if(i != j && i != k && j != k)
         {
+            poly->planes[i].n = Vec3Normalized(poly->planes[i].n);
+            poly->planes[j].n = Vec3Normalized(poly->planes[j].n);
+            poly->planes[k].n = Vec3Normalized(poly->planes[k].n);
             Plane a = poly->planes[i];
             Plane b = poly->planes[j];
             Plane c = poly->planes[k];
@@ -382,7 +385,6 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
                 }
                 if(illegal == false)
                 {
-                    // TODO: add the vertex
                     Vertex iVert = vertex; iVert.normal = poly->planes[i].n;
                     Vertex jVert = vertex; jVert.normal = poly->planes[j].n;
                     Vertex kVert = vertex; kVert.normal = poly->planes[k].n;
@@ -550,9 +552,9 @@ PolyPlane CreatePolyPlane(Vec2 xMinMax, Vec2 yMinMax, Vec2 zMinMax)
 PointToPlane ClassifyPointToPlane(Vec3 p, Plane plane)
 {
     f32 dist = Vec3Dot(plane.n, p) - plane.d;
-    if(dist > FLT_EPSILON)
+    if(dist > EPSILON)
         return POINT_IN_FRONT_OF_PLANE;
-    if(dist < -FLT_EPSILON)
+    if(dist< -EPSILON)
         return POINT_BEHIND_PLANE;
     return POINT_ON_PLANE;
 }
@@ -646,18 +648,83 @@ void ViewClipPolyVertex(i32 index, Plane clipPlane)
     }
 }
 
+Plane Poly3DCalculatePlane(Poly3D *poly)
+{
+    Vec3 centerOfMass;
+    f32	magnitude;
+    i32 i, j;
+
+    if ( poly->verticesCount < 3 )
+	{
+		printf("Polygon has less than 3 vertices!\n");
+        ASSERT(!"INVALID_CODE_PATH");
+	}
+
+    Plane plane = {};
+    centerOfMass.x	= 0.0f; 
+    centerOfMass.y	= 0.0f; 
+    centerOfMass.z	= 0.0f;
+
+    for ( i = 0; i < poly->verticesCount; i++ )
+    {
+        j = i + 1;
+
+        if ( j >= poly->verticesCount )
+		{
+			j = 0;
+		}
+
+        Vertex *verts = poly->vertices;
+
+        plane.n.x += ( verts[ i ].position.y - verts[ j ].position.y ) * ( verts[ i ].position.z + verts[ j ].position.z );
+        plane.n.y += ( verts[ i ].position.z - verts[ j ].position.z ) * ( verts[ i ].position.x + verts[ j ].position.x );
+        plane.n.z += ( verts[ i ].position.x - verts[ j ].position.x ) * ( verts[ i ].position.y + verts[ j ].position.y );
+
+        centerOfMass.x += verts[ i ].position.x;
+        centerOfMass.y += verts[ i ].position.y;
+        centerOfMass.z += verts[ i ].position.z;
+    }
+
+    if ( ( fabs ( plane.n.x ) < FLT_EPSILON ) &&
+         ( fabs ( plane.n.y ) < FLT_EPSILON ) &&
+		 ( fabs ( plane.n.z ) < FLT_EPSILON ) )
+    {
+         ASSERT(!"INVALID_CODE_PATH");
+    }
+
+    magnitude = sqrt ( plane.n.x * plane.n.x + plane.n.y * plane.n.y + plane.n.z * plane.n.z );
+
+    if ( magnitude < FLT_EPSILON )
+	{
+        ASSERT(!"INVALID_CODE_PATH");
+	}
+
+    plane.n.x /= magnitude;
+    plane.n.y /= magnitude;
+    plane.n.z /= magnitude;
+
+    plane.n = Vec3Normalized(plane.n);
+
+    centerOfMass.x /= (f32)poly->verticesCount;
+    centerOfMass.y /= (f32)poly->verticesCount;
+    centerOfMass.z /= (f32)poly->verticesCount;
+
+    plane.d = Vec3Dot(centerOfMass, plane.n);
+
+    return plane;
+
+}
+
 void ViewUpdatePolyPlaneFromPolyVertex(i32 index)
 {
     PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
     PolyVertex *polyVert = polyPlaneStorage->polyVerts + index;
     PolyPlane *polyPlane = polyPlaneStorage->polyPlanes + index;
 
-    for(i32 i = 0; i < polyPlane->planesCount; ++i)
+    for(i32 i = 0; i < polyVert->polygonsCount; ++i)
     {
         Poly3D *poly = polyVert->polygons + i;
-        Plane newPlane = GetPlaneFromThreePoints(poly->vertices[0].position,
-                                                 poly->vertices[1].position,
-                                                 poly->vertices[2].position);
+        Plane newPlane = Poly3DCalculatePlane(poly);
         polyPlane->planes[i] = newPlane;
     }
 

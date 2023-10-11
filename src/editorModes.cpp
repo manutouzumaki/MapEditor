@@ -342,6 +342,8 @@ void EditorModeModifyPoly(View *view)
     ViewOrthoState *state = &view->orthoState;
 
     i32 selectedPoly = gSharedMemory.selectedPolygon;
+
+    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
     Poly2DStorage *viewStorage = ViewGetPoly2DStorage(view);
 
 
@@ -496,9 +498,14 @@ void EditorModeModifyPoly(View *view)
         {
             color = 0xFFFFFF00;
         }
-        // TODO: see if we can use the drawPoly function here
         Draw2DQuad(state, quads[i].a, quads[i].b, quads[i].c, quads[i].d, color, -4.0f);
     }
+
+
+    Vec2 oBotL = {xDim.x, yDim.x};
+    Vec2 oBotR = {xDim.y, yDim.x};
+    Vec2 oTopL = {xDim.x, yDim.y};
+    Vec2 oTopR = {xDim.y, yDim.y};
 
 
     if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown)
@@ -509,6 +516,53 @@ void EditorModeModifyPoly(View *view)
         state->rect.min.y = botL.y;
         state->rect.max.x = topR.x;
         state->rect.max.y = topR.y;
+
+        f32 xNewDim = topR.x - botL.x; 
+        f32 yNewDim = topR.y - botL.y;
+
+        PolyVertex *polyVert = polyPlaneStorage->polyVerts + selectedPoly;
+        for(i32 j = 0; j < polyVert->polygonsCount; ++j)
+        {
+            Poly3D *poly = polyVert->polygons + j;
+            for(i32 i = 0; i < poly->verticesCount; ++i)
+            {
+                Vertex *v = poly->vertices + i;
+                Vec3 *p = &v->position;
+                switch(view->id)
+                {
+                    case VIEW_TOP:
+                    {
+                        // modify x and z coord
+                        f32 xRatio = (p->x - oBotL.x) / (oBotR.x - oBotL.x);
+                        f32 yRatio = (p->z - oBotL.y) / (oTopL.y - oBotL.y);
+                        p->x = botL.x + (xRatio * xNewDim);
+                        p->z = botL.y + (yRatio * yNewDim);
+                    } break;
+                    case VIEW_FRONT:
+                    {
+                        // modify x and y coord
+                        f32 xRatio = (p->x - oBotL.x) / (oBotR.x - oBotL.x);
+                        f32 yRatio = (p->y - oBotL.y) / (oTopL.y - oBotL.y);
+                        p->x = botL.x + (xRatio * xNewDim);
+                        p->y = botL.y + (yRatio * yNewDim);
+                    } break;
+                    case VIEW_SIDE:
+                    {
+                        // modify z and y coord
+                        f32 xRatio = (p->z - oBotL.x) / (oBotR.x - oBotL.x);
+                        f32 yRatio = (p->y - oBotL.y) / (oTopL.y - oBotL.y);
+                        p->z = botL.x + (xRatio * xNewDim);
+                        p->y = botL.y + (yRatio * yNewDim);
+                    } break;
+                }
+            }
+        }
+
+
+        ViewUpdatePolyPlaneFromPolyVertex(selectedPoly);
+        ViewUpdatePolyVertex2DFromPolyPlane(selectedPoly);
+        
+        // TODO: see if this function is still in use
         //ViewUpdateQuad(view, state->rect.min, state->rect.max, selectedPoly);
         //state->updateOtherViewsPolys(state->rect, selectedPoly, 0xFFFFFFAA);
         //ViewUpdatePolyPlane(selectedPoly);

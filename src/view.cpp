@@ -646,6 +646,30 @@ void ViewClipPolyVertex(i32 index, Plane clipPlane)
     }
 }
 
+void ViewUpdatePolyPlaneFromPolyVertex(i32 index)
+{
+    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
+    PolyVertex *polyVert = polyPlaneStorage->polyVerts + index;
+    PolyPlane *polyPlane = polyPlaneStorage->polyPlanes + index;
+
+    for(i32 i = 0; i < polyPlane->planesCount; ++i)
+    {
+        Poly3D *poly = polyVert->polygons + i;
+        Plane newPlane = GetPlaneFromThreePoints(poly->vertices[0].position,
+                                                 poly->vertices[1].position,
+                                                 poly->vertices[2].position);
+        polyPlane->planes[i] = newPlane;
+    }
+
+    // reload the dynamic vertex buffer
+    gDynamicVertexBuffer.used = 0;
+    gDynamicVertexBuffer.verticesCount = 0;
+    for(i32 i = 0; i < polyPlaneStorage->polygonsCount; ++i)
+    {
+        PushPolyVertexToVertexBuffer(polyPlaneStorage->polyVerts + i);
+    } 
+}
+
 void UpdateTopPolyVertex2D(PolyVertex *polyVert, PolyPlane *polyPlane, PolyVertex2D *polyVert2D, Vec3 normal)
 {
     // TOP:

@@ -404,7 +404,7 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
 
     }}}
 
-    // Set UVs
+    // Set UVs THIS IS WRONG I THINK uwu
     for(i32 i = 0; i < poly->planesCount; ++i)
     {
         // for now all our polys have for vertices
@@ -416,7 +416,19 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
         Vec3 center = GetCenterOfPolygon(polyD);
         for(i32 j = 0; j < polyD->verticesCount; ++j)
         {
-            Vec3 localP = Vec3Normalized(polyD->vertices[j].position - center);
+
+            polyD->vertices[j].texture = texture;
+#if 1
+            f32 u, v;
+            u = Vec3Dot(texAxis.u, polyD->vertices[j].position);
+            u = u / gUnitSize;
+
+            v = Vec3Dot(texAxis.v, polyD->vertices[j].position);
+            v = v / gUnitSize;
+
+            polyD->vertices[j].uv = { u, v };
+#else
+            Vec3 localP = Vec3Normalized(poly->vertices[j].position - center);
 
             Vec3 newP = {};
             if(localP.x != 0) newP.x = localP.x / localP.x;
@@ -433,20 +445,18 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
             u = Remap(-1.0f, 1.0f, 0.0f, 1.0f, u);
             v = Remap(-1.0f, 1.0f, 0.0f, 1.0f, v);
 
-            polyD->vertices[j].texture = texture;
-
             // calculate object face dim
             f32 xDim, yDim;
             
-            xDim = fabsf(Vec3Dot(texAxis.u, polyD->vertices[j].position - center));
+            xDim = fabsf(Vec3Dot(texAxis.u, poly->vertices[j].position - center));
             xDim = xDim / (gUnitSize*0.5f);
 
-            yDim = fabsf(Vec3Dot(texAxis.v, polyD->vertices[j].position - center));
+            yDim = fabsf(Vec3Dot(texAxis.v, poly->vertices[j].position - center));
             yDim = yDim / (gUnitSize*0.5f);
 
 
-            polyD->vertices[j].uv = { u*xDim, v*yDim };
-
+            poly->vertices[j].uv = { u*xDim, v*yDim };
+#endif
         }
     }
 
@@ -620,7 +630,7 @@ PolyToPlane ClassifyPolygonToPlane(Poly3D *poly, Plane plane)
     return POLYGON_COPLANAR_WITH_PLANE;
 }
 
-void ViewClipPolyVertex(i32 index, Plane clipPlane)
+void ViewClipPolyVertex(i32 index, Plane clipPlane, ViewId id)
 {
     // Clip the polyVert with the clip plane
     PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
@@ -661,7 +671,24 @@ void ViewClipPolyVertex(i32 index, Plane clipPlane)
     // Add the new clipPlane
     // TODO: fix this polyPlane axisNormal;
     newPolyPlane.planes[newPolyPlane.planesCount]      = clipPlane;
-    newPolyPlane.axisNormals[newPolyPlane.planesCount] =  { { 0,  0, 1}, {0, -1, 0} };
+    switch(id)
+    {
+        case VIEW_TOP: 
+        {
+            Vec3 tangent = {0, -1, 0};
+            newPolyPlane.axisNormals[newPolyPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
+        } break;
+        case VIEW_FRONT:
+        {
+            Vec3 tangent = {0, 0, 1};
+            newPolyPlane.axisNormals[newPolyPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
+        } break;
+        case VIEW_SIDE:
+        {
+            Vec3 tangent = {1, 0, 0};
+            newPolyPlane.axisNormals[newPolyPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
+        } break;
+    }
     newPolyPlane.textures[newPolyPlane.planesCount]    = newPolyPlane.textures[0];
     newPolyPlane.planesCount++;
 
@@ -754,8 +781,56 @@ void ViewUpdatePolyPlaneFromPolyVertex(i32 index)
     for(i32 i = 0; i < polyVert->polygonsCount; ++i)
     {
         Poly3D *poly = polyVert->polygons + i;
+
+        // Update the plane
         Plane newPlane = Poly3DCalculatePlane(poly);
         polyPlane->planes[i] = newPlane;
+
+        // Update the UVs
+        TextureAxisNormal texAxis = polyPlane->axisNormals[i];
+        Vec3 center = GetCenterOfPolygon(poly);
+        for(i32 j = 0; j < poly->verticesCount; ++j)
+        {
+#if 1
+            f32 u, v;
+            u = Vec3Dot(texAxis.u, poly->vertices[j].position);
+            u = u / gUnitSize;
+
+            v = Vec3Dot(texAxis.v, poly->vertices[j].position);
+            v = v / gUnitSize;
+
+            poly->vertices[j].uv = { u, v };
+#else
+            Vec3 localP = Vec3Normalized(poly->vertices[j].position - center);
+
+            Vec3 newP = {};
+            if(localP.x != 0) newP.x = localP.x / localP.x;
+            if(localP.y != 0) newP.y = localP.y / localP.y;
+            if(localP.z != 0) newP.z = localP.z / localP.z;
+            if(localP.x < 0) newP.x *= -1.0f;
+            if(localP.y < 0) newP.y *= -1.0f;
+            if(localP.z < 0) newP.z *= -1.0f;
+            localP = newP;
+
+            f32 u, v;
+            u = Vec3Dot(texAxis.u, localP);
+            v = Vec3Dot(texAxis.v, localP);
+            u = Remap(-1.0f, 1.0f, 0.0f, 1.0f, u);
+            v = Remap(-1.0f, 1.0f, 0.0f, 1.0f, v);
+
+            // calculate object face dim
+            f32 xDim, yDim;
+            
+            xDim = fabsf(Vec3Dot(texAxis.u, poly->vertices[j].position - center));
+            xDim = xDim / (gUnitSize*0.5f);
+
+            yDim = fabsf(Vec3Dot(texAxis.v, poly->vertices[j].position - center));
+            yDim = yDim / (gUnitSize*0.5f);
+
+
+            poly->vertices[j].uv = { u*xDim, v*yDim };
+#endif
+        }
     }
 
     // reload the dynamic vertex buffer

@@ -325,7 +325,7 @@ void EditorModeClipping(View *view)
         // a function that return the correct plane depending on the view you use to
         // create the clipping plane
         Plane clipPlane = state->createViewClipPlane(state->startP, state->endP);
-        ViewClipPolyVertex(selectedPoly, clipPlane);
+        ViewClipPolyVertex(selectedPoly, clipPlane, view->id);
         ViewUpdatePolyVertex2DFromPolyPlane(selectedPoly);
     }
 }

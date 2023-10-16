@@ -362,26 +362,28 @@ void RemoveVertexAtIndex(Poly3D *poly, i32 index)
 
 BrushVertex CreateBrushVertexFromBrushPlane(BrushPlane *brushPlane)
 {
+    i32  planesCount = DarraySize(brushPlane->planes);
     BrushVertex brushVertex{};
-    brushVertex.polygonsCount = brushPlane->planesCount;
+    brushVertex.polygons = (Poly3D *)DarrayCreate_(brushVertex.polygons, sizeof(Poly3D), planesCount);
+    memset(brushVertex.polygons, 0, sizeof(Poly3D)*planesCount);
 
-    for(i32 i = 0; i < brushPlane->planesCount - 2; ++i) {
-    for(i32 j = i; j < brushPlane->planesCount - 1; ++j) {
-    for(i32 k = j; k < brushPlane->planesCount - 0; ++k) {
+    for(i32 i = 0; i < planesCount - 2; ++i) {
+    for(i32 j = i; j < planesCount - 1; ++j) {
+    for(i32 k = j; k < planesCount - 0; ++k) {
 
         if(i != j && i != k && j != k)
         {
-            Plane a = brushPlane->planes[i];
-            Plane b = brushPlane->planes[j];
-            Plane c = brushPlane->planes[k];
+            Plane a = brushPlane->planes[i].plane;
+            Plane b = brushPlane->planes[j].plane;
+            Plane c = brushPlane->planes[k].plane;
 
             Vertex vertex = {};
             if(GetIntersection(a.n, b.n, c.n, a.d, b.d, c.d, &vertex))
             {
                 bool illegal = false;
-                for(i32 m = 0; m < brushPlane->planesCount; ++m)
+                for(i32 m = 0; m < planesCount; ++m)
                 {
-                    Plane plane = brushPlane->planes[m];
+                    Plane plane = brushPlane->planes[m].plane;
                     f32 dot = Vec3Dot(plane.n, vertex.position);
                     f32 d = plane.d;
                     f32 dist = dot - d;
@@ -392,9 +394,9 @@ BrushVertex CreateBrushVertexFromBrushPlane(BrushPlane *brushPlane)
                 }
                 if(illegal == false)
                 {
-                    Vertex iVert = vertex; iVert.normal = brushPlane->planes[i].n;
-                    Vertex jVert = vertex; jVert.normal = brushPlane->planes[j].n;
-                    Vertex kVert = vertex; kVert.normal = brushPlane->planes[k].n;
+                    Vertex iVert = vertex; iVert.normal = brushPlane->planes[i].plane.n;
+                    Vertex jVert = vertex; jVert.normal = brushPlane->planes[j].plane.n;
+                    Vertex kVert = vertex; kVert.normal = brushPlane->planes[k].plane.n;
                     brushVertex.polygons[i].vertices[brushVertex.polygons[i].verticesCount++] = iVert;
                     brushVertex.polygons[j].vertices[brushVertex.polygons[j].verticesCount++] = jVert;
                     brushVertex.polygons[k].vertices[brushVertex.polygons[k].verticesCount++] = kVert;
@@ -404,12 +406,10 @@ BrushVertex CreateBrushVertexFromBrushPlane(BrushPlane *brushPlane)
 
     }}}
 
-    for(i32 i = 0; i < brushPlane->planesCount; ++i)
+    for(i32 i = 0; i < planesCount; ++i)
     {
-        // for now all our polys have for vertices
-        // so we cant hard code the valus TODO: change this for a more general code
-        TextureAxisNormal texAxis = brushPlane->axisNormals[i];
-        u32 texture = brushPlane->textures[i];
+        TextureAxisNormal texAxis = brushPlane->planes[i].axisNormal;
+        u32 texture = brushPlane->planes[i].texture;
 
         Poly3D *polyD = &brushVertex.polygons[i];
         Vec3 center = GetCenterOfPolygon(polyD);
@@ -429,9 +429,9 @@ BrushVertex CreateBrushVertexFromBrushPlane(BrushPlane *brushPlane)
     }
 
     // order the vertices in the polygons
-    for(i32 p = 0; p < brushPlane->planesCount; ++p)
+    for(i32 p = 0; p < planesCount; ++p)
     {
-        Plane polygonPlane = brushPlane->planes[p]; 
+        Plane polygonPlane = brushPlane->planes[p].plane; 
         Poly3D *polygon = brushVertex.polygons + p;
 
         ASSERT(polygon->verticesCount >= 3);
@@ -473,7 +473,7 @@ BrushVertex CreateBrushVertexFromBrushPlane(BrushPlane *brushPlane)
     }
 
     // remove repeted vertex
-    for(i32 j = 0; j < brushVertex.polygonsCount; ++j)
+    for(i32 j = 0; j < DarraySize(brushVertex.polygons); ++j)
     {
         Poly3D *poly = brushVertex.polygons + j;
         for(i32 i = 0; i < poly->verticesCount; ++i)
@@ -502,7 +502,7 @@ void PushBrushVertexToVertexBuffer(BrushVertex *brushVertex)
 {
     Vertex *vertices = 0;
     
-    for(i32 i = 0; i < brushVertex->polygonsCount; ++i)
+    for(i32 i = 0; i < DarraySize(brushVertex->polygons); ++i)
     {
         Poly3D *polyD = &brushVertex->polygons[i];
         for(i32 j = 0; j < polyD->verticesCount - 2; ++j)
@@ -537,23 +537,22 @@ void PushBrushVertexToVertexBuffer(BrushVertex *brushVertex)
 // not just cubes
 BrushPlane CreateBrushPlane(Vec2 xMinMax, Vec2 yMinMax, Vec2 zMinMax)
 {
-    BrushPlane brushPlane;
+    BrushPlane brushPlane = {};
+    
+    PolyPlane polyPlane0 = { { { 1,  0,  0},  xMinMax.y }, { { 0,  0, 1}, {0, -1, 0} }, 0};
+    PolyPlane polyPlane1 = { { {-1,  0,  0}, -xMinMax.x }, { { 0,  0, 1}, {0, -1, 0} }, 0};
+    PolyPlane polyPlane2 = { { { 0,  1,  0},  yMinMax.y }, { { 1,  0, 0}, {0, 0, -1} }, 0};
+    PolyPlane polyPlane3 = { { { 0, -1,  0}, -yMinMax.x }, { { 1,  0, 0}, {0, 0, -1} }, 0};
+    PolyPlane polyPlane4 = { { { 0,  0,  1},  zMinMax.y }, { { 1,  0, 0}, {0, -1, 0} }, 0};
+    PolyPlane polyPlane5 = { { { 0,  0, -1}, -zMinMax.x }, { { 1,  0, 0}, {0, -1, 0} }, 0};
 
-    brushPlane.planes[0] = { { 1,  0,  0},  xMinMax.y };
-    brushPlane.planes[1] = { {-1,  0,  0}, -xMinMax.x };
-    brushPlane.planes[2] = { { 0,  1,  0},  yMinMax.y };
-    brushPlane.planes[3] = { { 0, -1,  0}, -yMinMax.x };
-    brushPlane.planes[4] = { { 0,  0,  1},  zMinMax.y };
-    brushPlane.planes[5] = { { 0,  0, -1}, -zMinMax.x };
+    DarrayPush(brushPlane.planes, polyPlane0, PolyPlane); 
+    DarrayPush(brushPlane.planes, polyPlane1, PolyPlane); 
+    DarrayPush(brushPlane.planes, polyPlane2, PolyPlane); 
+    DarrayPush(brushPlane.planes, polyPlane3, PolyPlane); 
+    DarrayPush(brushPlane.planes, polyPlane4, PolyPlane); 
+    DarrayPush(brushPlane.planes, polyPlane5, PolyPlane); 
 
-    brushPlane.axisNormals[0] = { { 0,  0, 1}, {0, -1, 0} };
-    brushPlane.axisNormals[1] = { { 0,  0, 1}, {0, -1, 0} };
-    brushPlane.axisNormals[2] = { { 1,  0, 0}, {0, 0, -1} };
-    brushPlane.axisNormals[3] = { { 1,  0, 0}, {0, 0, -1} };
-    brushPlane.axisNormals[4] = { { 1,  0, 0}, {0, -1, 0} };
-    brushPlane.axisNormals[5] = { { 1,  0, 0}, {0, -1, 0} };
-
-    brushPlane.planesCount = 6;
     return brushPlane;
 }
 
@@ -607,7 +606,7 @@ void ViewClipBrush(i32 index, Plane clipPlane, ViewId id)
 
     // Remove invalid planes
     i32 *planesToRemove = 0;
-    for(i32 i = 0; i < brushVert->polygonsCount; ++i)
+    for(i32 i = 0; i < DarraySize(brushVert->polygons); ++i)
     {
         Poly3D *poly = brushVert->polygons + i;
 
@@ -623,43 +622,47 @@ void ViewClipBrush(i32 index, Plane clipPlane, ViewId id)
 
     BrushPlane newBrushPlane = {};
 
-    for(i32 i = 0; i < brushPlane->planesCount; ++i)
+    for(i32 i = 0; i < DarraySize(brushPlane->planes); ++i)
     {
         if(planesToRemove[i] == 0)
         {
-            newBrushPlane.planes[newBrushPlane.planesCount] = brushPlane->planes[i];
-            newBrushPlane.axisNormals[newBrushPlane.planesCount] = brushPlane->axisNormals[i];
-            newBrushPlane.textures[newBrushPlane.planesCount] = brushPlane->textures[i];
-            newBrushPlane.planesCount++;
+            PolyPlane polyPlane;
+            polyPlane.plane = brushPlane->planes[i].plane;
+            polyPlane.axisNormal = brushPlane->planes[i].axisNormal;
+            polyPlane.texture = brushPlane->planes[i].texture;
+            DarrayPush(newBrushPlane.planes, polyPlane, PolyPlane);
         }
     }
 
     DarrayDestroy(planesToRemove);
 
     // Add the new clipPlane
-    newBrushPlane.planes[newBrushPlane.planesCount] = clipPlane;
+    Vec3 tangent;
     switch(id)
     {
         case VIEW_TOP: 
         {
-            Vec3 tangent = {0, -1, 0};
-            newBrushPlane.axisNormals[newBrushPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
+            tangent = {0, -1, 0};
         } break;
         case VIEW_FRONT:
         {
-            Vec3 tangent = {0, 0, 1};
-            newBrushPlane.axisNormals[newBrushPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
+            tangent = {0, 0, 1};
         } break;
         case VIEW_SIDE:
         {
-            Vec3 tangent = {1, 0, 0};
-            newBrushPlane.axisNormals[newBrushPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
+            tangent = {1, 0, 0};
         } break;
     }
-    newBrushPlane.textures[newBrushPlane.planesCount] = newBrushPlane.textures[0];
-    newBrushPlane.planesCount++;
 
-    // TODO: we probably will have to change this
+    PolyPlane polyPlane;
+    polyPlane.plane = clipPlane;
+    polyPlane.axisNormal =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
+    polyPlane.texture = newBrushPlane.planes[0].texture;
+    DarrayPush(newBrushPlane.planes, polyPlane, PolyPlane);
+
+    // delete the old array
+    if(brushPlane->planes) DarrayDestroy(brushPlane->planes);
+    if(brushVert->polygons) DarrayDestroy(brushVert->polygons);
     *brushPlane = newBrushPlane;
     *brushVert = CreateBrushVertexFromBrushPlane(brushPlane);
 
@@ -745,16 +748,16 @@ void ViewUpdateBrushPlaneFromBrushVertex(i32 index)
     BrushVertex *brushVert = brushStorage->brushVerts + index;
     BrushPlane *brushPlane = brushStorage->brushPlanes + index;
 
-    for(i32 i = 0; i < brushVert->polygonsCount; ++i)
+    for(i32 i = 0; i < DarraySize(brushVert->polygons); ++i)
     {
         Poly3D *poly = brushVert->polygons + i;
 
         // Update the plane
         Plane newPlane = Poly3DCalculatePlane(poly);
-        brushPlane->planes[i] = newPlane;
+        brushPlane->planes[i].plane = newPlane;
 
         // Update the UVs
-        TextureAxisNormal texAxis = brushPlane->axisNormals[i];
+        TextureAxisNormal texAxis = brushPlane->planes[i].axisNormal;
         Vec3 center = GetCenterOfPolygon(poly);
         for(i32 j = 0; j < poly->verticesCount; ++j)
         {
@@ -791,9 +794,9 @@ void UpdateBrush2D(BrushVertex *brushVert, BrushPlane *brushPlane, Brush2D *brus
     brush2D->polygons = 0;
     
     i32 *facesToAdd = 0;
-    for(i32 i = 0; i < brushPlane->planesCount; ++i)
+    for(i32 i = 0; i < DarraySize(brushPlane->planes); ++i)
     {
-        Plane p = brushPlane->planes[i];
+        Plane p = brushPlane->planes[i].plane;
         f32 dot = Vec3Dot(p.n, normal);
         if(dot >= FLT_EPSILON || dot <= -FLT_EPSILON)
         {
@@ -904,12 +907,12 @@ i32 ViewAddBrushPlane()
     }
 
     BrushPlane brushPlane = CreateBrushPlane(xDim, yDim, zDim);
-    brushPlane.textures[0] = gCurrentTexture;
-    brushPlane.textures[1] = gCurrentTexture;
-    brushPlane.textures[2] = gCurrentTexture;
-    brushPlane.textures[3] = gCurrentTexture;
-    brushPlane.textures[4] = gCurrentTexture;
-    brushPlane.textures[5] = gCurrentTexture;
+    brushPlane.planes[0].texture = gCurrentTexture;
+    brushPlane.planes[1].texture = gCurrentTexture;
+    brushPlane.planes[2].texture = gCurrentTexture;
+    brushPlane.planes[3].texture = gCurrentTexture;
+    brushPlane.planes[4].texture = gCurrentTexture;
+    brushPlane.planes[5].texture = gCurrentTexture;
     brushStorage->brushPlanes[index] = brushPlane;
     brushStorage->brushVerts[index] = CreateBrushVertexFromBrushPlane(&brushPlane);
     PushBrushVertexToVertexBuffer(brushStorage->brushVerts + index);

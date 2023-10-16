@@ -137,31 +137,33 @@ struct TextureAxisNormal
     Vec3 u, v;
 };
 
-// TODO: change this to use a Darray
-struct Poly3D
-{
-    Vertex vertices[64];
-    i32 verticesCount;
-};
-
 struct Poly2D
 {
     Vec2 *vertices;
     u32 color;
 };
 
+struct Poly3D
+{
+    Vertex vertices[256];
+    i32 verticesCount;
+};
+
+struct PolyPlane
+{
+    Plane plane;
+    TextureAxisNormal axisNormal;
+    u32 texture;
+};
+
 struct BrushPlane
 {
-    Plane planes[64];
-    TextureAxisNormal axisNormals[64];
-    u32 textures[64];
-    i32 planesCount;
+    PolyPlane *planes;
 };
 
 struct BrushVertex
 {
-    Poly3D polygons[64];
-    i32 polygonsCount;
+    Poly3D *polygons;
 };
 
 struct Brush2D
@@ -170,6 +172,16 @@ struct Brush2D
 };
 
 // TODO: use a link list base storage system
+struct Entity 
+{
+    BrushPlane brushPlane;
+    BrushVertex brushVert;
+    Brush2D brushes2D[3];
+
+    Entity *next;
+    Entity *prev;
+};
+
 struct Brush2DStorage
 {
     Brush2D *brushes;

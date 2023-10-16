@@ -517,7 +517,7 @@ void EditorModeModifyPoly(View *view)
         f32 yNewDim = topR.y - botL.y;
 
         BrushVertex *brushVert = brushStorage->brushVerts + selectedPoly;
-        for(i32 j = 0; j < brushVert->polygonsCount; ++j)
+        for(i32 j = 0; j < DarraySize(brushVert->polygons); ++j)
         {
             Poly3D *poly = brushVert->polygons + j;
             for(i32 i = 0; i < poly->verticesCount; ++i)
@@ -659,9 +659,9 @@ static bool RayHitBrushPlane(Ray ray, BrushPlane *brushPlane, f32 *tOut)
     f32 tFirst = 0;
     f32 tLast = FLT_MAX;
     // intersect segment agains each plane
-    for(i32 i = 0; i < brushPlane->planesCount; ++i)
+    for(i32 i = 0; i < DarraySize(brushPlane->planes); ++i)
     {
-        Plane p = brushPlane->planes[i];
+        Plane p = brushPlane->planes[i].plane;
         f32 denom = Vec3Dot(p.n, d);
         f32 dist = (p.d / g3DScale) - Vec3Dot(p.n, a);
         // test if segment runs parallel to tha plane

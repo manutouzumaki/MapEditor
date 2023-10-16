@@ -4,8 +4,8 @@ typedef void (*SetupFNP) (View *view);
 typedef void (*ProcessFNP) (View *view);
 typedef void (*RenderFNP) (View *view);
 
-typedef void (*AddOtherViewsPolysFNP) (Vec2 start, Vec2 end, u32 color);
-typedef void (*UpdateOtherViewsPolysFNP) (RectMinMax rect, i32 quadIndex, u32 color);
+typedef void (*AddOtherViewsBrushFNP) (Vec2 start, Vec2 end, u32 color);
+typedef void (*UpdateOtherViewsBrushFNP) (RectMinMax rect, i32 quadIndex, u32 color);
 typedef Plane (*CreateViewClipPlaneFNP) (Vec2 a, Vec2 b);
 
 typedef i32 (*MousePickingFNP) (View *view);
@@ -67,8 +67,8 @@ struct ViewOrthoState
     Vec2 endP;
     i32 quadIndex;
     RectMinMax rect;
-    AddOtherViewsPolysFNP addOtherViewsPolys;
-    UpdateOtherViewsPolysFNP updateOtherViewsPolys;
+    AddOtherViewsBrushFNP addOtherViewsBrush;
+    UpdateOtherViewsBrushFNP updateOtherViewsBrush;
     CreateViewClipPlaneFNP createViewClipPlane;
 
 };
@@ -311,10 +311,10 @@ void ViewOrthoBaseRender(View *view)
     LineRendererDraw();
 }
 
-Poly2DStorage *ViewGetPoly2DStorage(View *view)
+Brush2DStorage *ViewGetBrush2DStorage(View *view)
 {
-    Poly2DStorage *poly2dStorage = gSharedMemory.poly2dStorage + view->id;
-    return poly2dStorage;
+    Brush2DStorage *brush2dStorage = gSharedMemory.brush2dStorage + view->id;
+    return brush2dStorage;
 }
 
 
@@ -360,28 +360,28 @@ void RemoveVertexAtIndex(Poly3D *poly, i32 index)
     poly->verticesCount--;
 }
 
-PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
+BrushVertex CreateBrushVertexFromBrushPlane(BrushPlane *brushPlane)
 {
-    PolyVertex polyVertex{};
-    polyVertex.polygonsCount = poly->planesCount;
+    BrushVertex brushVertex{};
+    brushVertex.polygonsCount = brushPlane->planesCount;
 
-    for(i32 i = 0; i < poly->planesCount - 2; ++i) {
-    for(i32 j = i; j < poly->planesCount - 1; ++j) {
-    for(i32 k = j; k < poly->planesCount - 0; ++k) {
+    for(i32 i = 0; i < brushPlane->planesCount - 2; ++i) {
+    for(i32 j = i; j < brushPlane->planesCount - 1; ++j) {
+    for(i32 k = j; k < brushPlane->planesCount - 0; ++k) {
 
         if(i != j && i != k && j != k)
         {
-            Plane a = poly->planes[i];
-            Plane b = poly->planes[j];
-            Plane c = poly->planes[k];
+            Plane a = brushPlane->planes[i];
+            Plane b = brushPlane->planes[j];
+            Plane c = brushPlane->planes[k];
 
             Vertex vertex = {};
             if(GetIntersection(a.n, b.n, c.n, a.d, b.d, c.d, &vertex))
             {
                 bool illegal = false;
-                for(i32 m = 0; m < poly->planesCount; ++m)
+                for(i32 m = 0; m < brushPlane->planesCount; ++m)
                 {
-                    Plane plane = poly->planes[m];
+                    Plane plane = brushPlane->planes[m];
                     f32 dot = Vec3Dot(plane.n, vertex.position);
                     f32 d = plane.d;
                     f32 dist = dot - d;
@@ -392,33 +392,31 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
                 }
                 if(illegal == false)
                 {
-                    Vertex iVert = vertex; iVert.normal = poly->planes[i].n;
-                    Vertex jVert = vertex; jVert.normal = poly->planes[j].n;
-                    Vertex kVert = vertex; kVert.normal = poly->planes[k].n;
-                    polyVertex.polygons[i].vertices[polyVertex.polygons[i].verticesCount++] = iVert;
-                    polyVertex.polygons[j].vertices[polyVertex.polygons[j].verticesCount++] = jVert;
-                    polyVertex.polygons[k].vertices[polyVertex.polygons[k].verticesCount++] = kVert;
+                    Vertex iVert = vertex; iVert.normal = brushPlane->planes[i].n;
+                    Vertex jVert = vertex; jVert.normal = brushPlane->planes[j].n;
+                    Vertex kVert = vertex; kVert.normal = brushPlane->planes[k].n;
+                    brushVertex.polygons[i].vertices[brushVertex.polygons[i].verticesCount++] = iVert;
+                    brushVertex.polygons[j].vertices[brushVertex.polygons[j].verticesCount++] = jVert;
+                    brushVertex.polygons[k].vertices[brushVertex.polygons[k].verticesCount++] = kVert;
                 }
             }
         }
 
     }}}
 
-    // Set UVs THIS IS WRONG I THINK uwu
-    for(i32 i = 0; i < poly->planesCount; ++i)
+    for(i32 i = 0; i < brushPlane->planesCount; ++i)
     {
         // for now all our polys have for vertices
         // so we cant hard code the valus TODO: change this for a more general code
-        TextureAxisNormal texAxis = poly->axisNormals[i];
-        u32 texture = poly->textures[i];
+        TextureAxisNormal texAxis = brushPlane->axisNormals[i];
+        u32 texture = brushPlane->textures[i];
 
-        Poly3D *polyD = &polyVertex.polygons[i];
+        Poly3D *polyD = &brushVertex.polygons[i];
         Vec3 center = GetCenterOfPolygon(polyD);
         for(i32 j = 0; j < polyD->verticesCount; ++j)
         {
-
             polyD->vertices[j].texture = texture;
-#if 1
+
             f32 u, v;
             u = Vec3Dot(texAxis.u, polyD->vertices[j].position);
             u = u / gUnitSize;
@@ -427,44 +425,14 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
             v = v / gUnitSize;
 
             polyD->vertices[j].uv = { u, v };
-#else
-            Vec3 localP = Vec3Normalized(poly->vertices[j].position - center);
-
-            Vec3 newP = {};
-            if(localP.x != 0) newP.x = localP.x / localP.x;
-            if(localP.y != 0) newP.y = localP.y / localP.y;
-            if(localP.z != 0) newP.z = localP.z / localP.z;
-            if(localP.x < 0) newP.x *= -1.0f;
-            if(localP.y < 0) newP.y *= -1.0f;
-            if(localP.z < 0) newP.z *= -1.0f;
-            localP = newP;
-
-            f32 u, v;
-            u = Vec3Dot(texAxis.u, localP);
-            v = Vec3Dot(texAxis.v, localP);
-            u = Remap(-1.0f, 1.0f, 0.0f, 1.0f, u);
-            v = Remap(-1.0f, 1.0f, 0.0f, 1.0f, v);
-
-            // calculate object face dim
-            f32 xDim, yDim;
-            
-            xDim = fabsf(Vec3Dot(texAxis.u, poly->vertices[j].position - center));
-            xDim = xDim / (gUnitSize*0.5f);
-
-            yDim = fabsf(Vec3Dot(texAxis.v, poly->vertices[j].position - center));
-            yDim = yDim / (gUnitSize*0.5f);
-
-
-            poly->vertices[j].uv = { u*xDim, v*yDim };
-#endif
         }
     }
 
     // order the vertices in the polygons
-    for(i32 p = 0; p < poly->planesCount; ++p)
+    for(i32 p = 0; p < brushPlane->planesCount; ++p)
     {
-        Plane polygonPlane = poly->planes[p]; 
-        Poly3D *polygon = polyVertex.polygons + p;
+        Plane polygonPlane = brushPlane->planes[p]; 
+        Poly3D *polygon = brushVertex.polygons + p;
 
         ASSERT(polygon->verticesCount >= 3);
 
@@ -505,9 +473,9 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
     }
 
     // remove repeted vertex
-    for(i32 j = 0; j < polyVertex.polygonsCount; ++j)
+    for(i32 j = 0; j < brushVertex.polygonsCount; ++j)
     {
-        Poly3D *poly = polyVertex.polygons + j;
+        Poly3D *poly = brushVertex.polygons + j;
         for(i32 i = 0; i < poly->verticesCount; ++i)
         {
             Vertex a = poly->vertices[i];
@@ -527,16 +495,16 @@ PolyVertex CreatePolyVertexFromPolyPlane(PolyPlane *poly)
         }
     }
 
-    return polyVertex;
+    return brushVertex;
 }
 
-void PushPolyVertexToVertexBuffer(PolyVertex *poly)
+void PushBrushVertexToVertexBuffer(BrushVertex *brushVertex)
 {
     Vertex *vertices = 0;
     
-    for(i32 i = 0; i < poly->polygonsCount; ++i)
+    for(i32 i = 0; i < brushVertex->polygonsCount; ++i)
     {
-        Poly3D *polyD = &poly->polygons[i];
+        Poly3D *polyD = &brushVertex->polygons[i];
         for(i32 j = 0; j < polyD->verticesCount - 2; ++j)
         {
             Vertex a = polyD->vertices[0];
@@ -567,26 +535,26 @@ void PushPolyVertexToVertexBuffer(PolyVertex *poly)
 
 // TODO: remplace this function for a generic polygon function
 // not just cubes
-PolyPlane CreatePolyPlane(Vec2 xMinMax, Vec2 yMinMax, Vec2 zMinMax)
+BrushPlane CreateBrushPlane(Vec2 xMinMax, Vec2 yMinMax, Vec2 zMinMax)
 {
-    PolyPlane poly;
+    BrushPlane brushPlane;
 
-    poly.planes[0] = { { 1,  0,  0},  xMinMax.y };
-    poly.planes[1] = { {-1,  0,  0}, -xMinMax.x };
-    poly.planes[2] = { { 0,  1,  0},  yMinMax.y };
-    poly.planes[3] = { { 0, -1,  0}, -yMinMax.x };
-    poly.planes[4] = { { 0,  0,  1},  zMinMax.y };
-    poly.planes[5] = { { 0,  0, -1}, -zMinMax.x };
+    brushPlane.planes[0] = { { 1,  0,  0},  xMinMax.y };
+    brushPlane.planes[1] = { {-1,  0,  0}, -xMinMax.x };
+    brushPlane.planes[2] = { { 0,  1,  0},  yMinMax.y };
+    brushPlane.planes[3] = { { 0, -1,  0}, -yMinMax.x };
+    brushPlane.planes[4] = { { 0,  0,  1},  zMinMax.y };
+    brushPlane.planes[5] = { { 0,  0, -1}, -zMinMax.x };
 
-    poly.axisNormals[0] = { { 0,  0, 1}, {0, -1, 0} };
-    poly.axisNormals[1] = { { 0,  0, 1}, {0, -1, 0} };
-    poly.axisNormals[2] = { { 1,  0, 0}, {0, 0, -1} };
-    poly.axisNormals[3] = { { 1,  0, 0}, {0, 0, -1} };
-    poly.axisNormals[4] = { { 1,  0, 0}, {0, -1, 0} };
-    poly.axisNormals[5] = { { 1,  0, 0}, {0, -1, 0} };
+    brushPlane.axisNormals[0] = { { 0,  0, 1}, {0, -1, 0} };
+    brushPlane.axisNormals[1] = { { 0,  0, 1}, {0, -1, 0} };
+    brushPlane.axisNormals[2] = { { 1,  0, 0}, {0, 0, -1} };
+    brushPlane.axisNormals[3] = { { 1,  0, 0}, {0, 0, -1} };
+    brushPlane.axisNormals[4] = { { 1,  0, 0}, {0, -1, 0} };
+    brushPlane.axisNormals[5] = { { 1,  0, 0}, {0, -1, 0} };
 
-    poly.planesCount = 6;
-    return poly;
+    brushPlane.planesCount = 6;
+    return brushPlane;
 }
 
 PointToPlane ClassifyPointToPlane(Vec3 p, Plane plane)
@@ -630,18 +598,18 @@ PolyToPlane ClassifyPolygonToPlane(Poly3D *poly, Plane plane)
     return POLYGON_COPLANAR_WITH_PLANE;
 }
 
-void ViewClipPolyVertex(i32 index, Plane clipPlane, ViewId id)
+void ViewClipBrush(i32 index, Plane clipPlane, ViewId id)
 {
     // Clip the polyVert with the clip plane
-    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
-    PolyVertex *polyVert = polyPlaneStorage->polyVerts + index;
-    PolyPlane *polyPlane = polyPlaneStorage->polyPlanes + index;
+    BrushStorage *brushStorage = &gSharedMemory.brushStorage;
+    BrushVertex *brushVert = brushStorage->brushVerts + index;
+    BrushPlane *brushPlane = brushStorage->brushPlanes + index;
 
     // Remove invalid planes
     i32 *planesToRemove = 0;
-    for(i32 i = 0; i < polyVert->polygonsCount; ++i)
+    for(i32 i = 0; i < brushVert->polygonsCount; ++i)
     {
-        Poly3D *poly = polyVert->polygons + i;
+        Poly3D *poly = brushVert->polygons + i;
 
         if(ClassifyPolygonToPlane(poly, clipPlane) == POLYGON_IN_FRONT_OF_PLANE)
         {
@@ -653,55 +621,54 @@ void ViewClipPolyVertex(i32 index, Plane clipPlane, ViewId id)
         }
     }
 
-    PolyPlane newPolyPlane = {};
+    BrushPlane newBrushPlane = {};
 
-    for(i32 i = 0; i < polyPlane->planesCount; ++i)
+    for(i32 i = 0; i < brushPlane->planesCount; ++i)
     {
         if(planesToRemove[i] == 0)
         {
-            newPolyPlane.planes[newPolyPlane.planesCount] = polyPlane->planes[i];
-            newPolyPlane.axisNormals[newPolyPlane.planesCount] = polyPlane->axisNormals[i];
-            newPolyPlane.textures[newPolyPlane.planesCount] = polyPlane->textures[i];
-            newPolyPlane.planesCount++;
+            newBrushPlane.planes[newBrushPlane.planesCount] = brushPlane->planes[i];
+            newBrushPlane.axisNormals[newBrushPlane.planesCount] = brushPlane->axisNormals[i];
+            newBrushPlane.textures[newBrushPlane.planesCount] = brushPlane->textures[i];
+            newBrushPlane.planesCount++;
         }
     }
 
     DarrayDestroy(planesToRemove);
 
     // Add the new clipPlane
-    // TODO: fix this polyPlane axisNormal;
-    newPolyPlane.planes[newPolyPlane.planesCount]      = clipPlane;
+    newBrushPlane.planes[newBrushPlane.planesCount] = clipPlane;
     switch(id)
     {
         case VIEW_TOP: 
         {
             Vec3 tangent = {0, -1, 0};
-            newPolyPlane.axisNormals[newPolyPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
+            newBrushPlane.axisNormals[newBrushPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
         } break;
         case VIEW_FRONT:
         {
             Vec3 tangent = {0, 0, 1};
-            newPolyPlane.axisNormals[newPolyPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
+            newBrushPlane.axisNormals[newBrushPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
         } break;
         case VIEW_SIDE:
         {
             Vec3 tangent = {1, 0, 0};
-            newPolyPlane.axisNormals[newPolyPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
+            newBrushPlane.axisNormals[newBrushPlane.planesCount] =  {Vec3Normalized(Vec3Cross(clipPlane.n, tangent)), tangent};
         } break;
     }
-    newPolyPlane.textures[newPolyPlane.planesCount]    = newPolyPlane.textures[0];
-    newPolyPlane.planesCount++;
+    newBrushPlane.textures[newBrushPlane.planesCount] = newBrushPlane.textures[0];
+    newBrushPlane.planesCount++;
 
     // TODO: we probably will have to change this
-    *polyPlane = newPolyPlane;
-    *polyVert = CreatePolyVertexFromPolyPlane(polyPlane);
+    *brushPlane = newBrushPlane;
+    *brushVert = CreateBrushVertexFromBrushPlane(brushPlane);
 
     // reload the dynamic vertex buffer
     gDynamicVertexBuffer.used = 0;
     gDynamicVertexBuffer.verticesCount = 0;
-    for(i32 i = 0; i < polyPlaneStorage->polygonsCount; ++i)
+    for(i32 i = 0; i < brushStorage->brushesCount; ++i)
     {
-        PushPolyVertexToVertexBuffer(polyPlaneStorage->polyVerts + i);
+        PushBrushVertexToVertexBuffer(brushStorage->brushVerts + i);
     }
 }
 
@@ -772,26 +739,25 @@ Plane Poly3DCalculatePlane(Poly3D *poly)
 
 }
 
-void ViewUpdatePolyPlaneFromPolyVertex(i32 index)
+void ViewUpdateBrushPlaneFromBrushVertex(i32 index)
 {
-    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
-    PolyVertex *polyVert = polyPlaneStorage->polyVerts + index;
-    PolyPlane *polyPlane = polyPlaneStorage->polyPlanes + index;
+    BrushStorage *brushStorage = &gSharedMemory.brushStorage;
+    BrushVertex *brushVert = brushStorage->brushVerts + index;
+    BrushPlane *brushPlane = brushStorage->brushPlanes + index;
 
-    for(i32 i = 0; i < polyVert->polygonsCount; ++i)
+    for(i32 i = 0; i < brushVert->polygonsCount; ++i)
     {
-        Poly3D *poly = polyVert->polygons + i;
+        Poly3D *poly = brushVert->polygons + i;
 
         // Update the plane
         Plane newPlane = Poly3DCalculatePlane(poly);
-        polyPlane->planes[i] = newPlane;
+        brushPlane->planes[i] = newPlane;
 
         // Update the UVs
-        TextureAxisNormal texAxis = polyPlane->axisNormals[i];
+        TextureAxisNormal texAxis = brushPlane->axisNormals[i];
         Vec3 center = GetCenterOfPolygon(poly);
         for(i32 j = 0; j < poly->verticesCount; ++j)
         {
-#if 1
             f32 u, v;
             u = Vec3Dot(texAxis.u, poly->vertices[j].position);
             u = u / gUnitSize;
@@ -800,65 +766,34 @@ void ViewUpdatePolyPlaneFromPolyVertex(i32 index)
             v = v / gUnitSize;
 
             poly->vertices[j].uv = { u, v };
-#else
-            Vec3 localP = Vec3Normalized(poly->vertices[j].position - center);
-
-            Vec3 newP = {};
-            if(localP.x != 0) newP.x = localP.x / localP.x;
-            if(localP.y != 0) newP.y = localP.y / localP.y;
-            if(localP.z != 0) newP.z = localP.z / localP.z;
-            if(localP.x < 0) newP.x *= -1.0f;
-            if(localP.y < 0) newP.y *= -1.0f;
-            if(localP.z < 0) newP.z *= -1.0f;
-            localP = newP;
-
-            f32 u, v;
-            u = Vec3Dot(texAxis.u, localP);
-            v = Vec3Dot(texAxis.v, localP);
-            u = Remap(-1.0f, 1.0f, 0.0f, 1.0f, u);
-            v = Remap(-1.0f, 1.0f, 0.0f, 1.0f, v);
-
-            // calculate object face dim
-            f32 xDim, yDim;
-            
-            xDim = fabsf(Vec3Dot(texAxis.u, poly->vertices[j].position - center));
-            xDim = xDim / (gUnitSize*0.5f);
-
-            yDim = fabsf(Vec3Dot(texAxis.v, poly->vertices[j].position - center));
-            yDim = yDim / (gUnitSize*0.5f);
-
-
-            poly->vertices[j].uv = { u*xDim, v*yDim };
-#endif
         }
     }
 
     // reload the dynamic vertex buffer
     gDynamicVertexBuffer.used = 0;
     gDynamicVertexBuffer.verticesCount = 0;
-    for(i32 i = 0; i < polyPlaneStorage->polygonsCount; ++i)
+    for(i32 i = 0; i < brushStorage->brushesCount; ++i)
     {
-        PushPolyVertexToVertexBuffer(polyPlaneStorage->polyVerts + i);
+        PushBrushVertexToVertexBuffer(brushStorage->brushVerts + i);
     } 
 }
 
-void UpdateTopPolyVertex2D(PolyVertex *polyVert, PolyPlane *polyPlane, PolyVertex2D *polyVert2D, Vec3 normal)
+void UpdateBrush2D(BrushVertex *brushVert, BrushPlane *brushPlane, Brush2D *brush2D, Vec3 normal)
 {
-    // TOP:
     // we need to add to the vertexPoly2D all the face that are not perpendicular to (0, 1, 0)
     // remove all the old information
-    for(i32 i = 0; i < DarraySize(polyVert2D->polygons); ++i)
+    for(i32 i = 0; i < DarraySize(brush2D->polygons); ++i)
     {
-        Poly2D *poly = polyVert2D->polygons + i;
+        Poly2D *poly = brush2D->polygons + i;
         DarrayDestroy(poly->vertices);
     }
-    DarrayDestroy(polyVert2D->polygons);
-    polyVert2D->polygons = 0;
+    DarrayDestroy(brush2D->polygons);
+    brush2D->polygons = 0;
     
     i32 *facesToAdd = 0;
-    for(i32 i = 0; i < polyPlane->planesCount; ++i)
+    for(i32 i = 0; i < brushPlane->planesCount; ++i)
     {
-        Plane p = polyPlane->planes[i];
+        Plane p = brushPlane->planes[i];
         f32 dot = Vec3Dot(p.n, normal);
         if(dot >= FLT_EPSILON || dot <= -FLT_EPSILON)
         {
@@ -869,7 +804,7 @@ void UpdateTopPolyVertex2D(PolyVertex *polyVert, PolyPlane *polyPlane, PolyVerte
     for(i32 i = 0; i < DarraySize(facesToAdd); ++i)
     {
         i32 faceIndex = facesToAdd[i];
-        Poly3D *poly3D = polyVert->polygons + faceIndex;
+        Poly3D *poly3D = brushVert->polygons + faceIndex;
         Poly2D poly2D = {};
         poly2D.color = 0xFFFFFFAA;
         for(i32 j = 0; j < poly3D->verticesCount; ++j)
@@ -888,117 +823,46 @@ void UpdateTopPolyVertex2D(PolyVertex *polyVert, PolyPlane *polyPlane, PolyVerte
 
             DarrayPush(poly2D.vertices, vertice, Vec2);
         }
-        DarrayPush(polyVert2D->polygons, poly2D, Poly2D);
+        DarrayPush(brush2D->polygons, poly2D, Poly2D);
     }
 
     DarrayDestroy(facesToAdd);
 }
 
-void ViewUpdatePolyVertex2DFromPolyPlane(i32 index)
+void ViewUpdateBrush2DFromBrushPlane(i32 index)
 {
-    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
-    Poly2DStorage *topStorage = gSharedMemory.poly2dStorage + VIEW_TOP;
-    Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
-    Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
+    BrushStorage *brushStorage = &gSharedMemory.brushStorage;
+    Brush2DStorage *topStorage = gSharedMemory.brush2dStorage + VIEW_TOP;
+    Brush2DStorage *frontStorage = gSharedMemory.brush2dStorage + VIEW_FRONT;
+    Brush2DStorage *sideStorage = gSharedMemory.brush2dStorage + VIEW_SIDE;
 
     // src (where we get the data from)
-    PolyVertex   *polyVert    = polyPlaneStorage->polyVerts  + index;
-    PolyPlane    *polyPlane   = polyPlaneStorage->polyPlanes + index;
+    BrushVertex   *brushVert    = brushStorage->brushVerts  + index;
+    BrushPlane    *brushPlane   = brushStorage->brushPlanes + index;
     // dst (what we need to modify with the data we get)
-    PolyVertex2D *topVert2D   = topStorage->polyVerts        + index;
-    PolyVertex2D *frontVert2D = frontStorage->polyVerts      + index;
-    PolyVertex2D *sideVert2D  = sideStorage->polyVerts       + index;
+    Brush2D *topBrush2D   = topStorage->brushes   + index;
+    Brush2D *frontBrush2D = frontStorage->brushes + index;
+    Brush2D *sideBrush2D  = sideStorage->brushes  + index;
 
-    UpdateTopPolyVertex2D(polyVert, polyPlane, topVert2D, {0, 1, 0});
-    UpdateTopPolyVertex2D(polyVert, polyPlane, frontVert2D, {0, 0, 1});
-    UpdateTopPolyVertex2D(polyVert, polyPlane, sideVert2D, {1, 0, 0});
+    UpdateBrush2D(brushVert, brushPlane, topBrush2D,   {0, 1, 0});
+    UpdateBrush2D(brushVert, brushPlane, frontBrush2D, {0, 0, 1});
+    UpdateBrush2D(brushVert, brushPlane, sideBrush2D,  {1, 0, 0});
 }
 
-void ViewUpdatePolyPlane(i32 index)
+i32 ViewAddBrushPlane()
 {
-    /*
-    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
-    Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
-    Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
+    BrushStorage *brushStorage = &gSharedMemory.brushStorage;
+    Brush2DStorage *frontStorage = gSharedMemory.brush2dStorage + VIEW_FRONT;
+    Brush2DStorage *sideStorage = gSharedMemory.brush2dStorage + VIEW_SIDE;
 
-    Poly2D *front = frontStorage->polygons + index;
-    Poly2D *side  = sideStorage->polygons  + index;
+    ASSERT((brushStorage->brushesCount + 1) < ARRAY_LENGTH(brushStorage->brushPlanes));
+    i32 index = brushStorage->brushesCount++;
 
-    Vec2 xDim = {FLT_MAX, -FLT_MAX}; 
-    Vec2 yDim = {FLT_MAX, -FLT_MAX}; 
-    Vec2 zDim = {FLT_MAX, -FLT_MAX};
+    Brush2D *frontBrush = frontStorage->brushes + index;
+    Brush2D *sideBrush  = sideStorage->brushes  + index;
 
-    for(i32 i = 0; i < front->verticesCount; ++i)
-    {
-        Vec2 vertice = front->vertices[i];
-        if(vertice.x <= xDim.x)
-        {
-            xDim.x = vertice.x;
-        }
-        if(vertice.x >= xDim.y)
-        {
-            xDim.y = vertice.x;
-        }
-
-        if(vertice.y <= yDim.x)
-        {
-            yDim.x = vertice.y;
-        }
-        if(vertice.y >= yDim.y)
-        {
-            yDim.y = vertice.y;
-        }
-    }
-
-    for(i32 i = 0; i < side->verticesCount; ++i)
-    {
-        Vec2 vertice = side->vertices[i];
-        if(vertice.x <= zDim.x)
-        {
-            zDim.x = vertice.x;
-        }
-        if(vertice.x >= zDim.y)
-        {
-            zDim.y = vertice.x;
-        }
-    }
-
-    PolyPlane poly = CreatePolyPlane(xDim, yDim, zDim);
-
-    poly.textures[0] = polyPlaneStorage->polyPlanes[index].textures[0];
-    poly.textures[1] = polyPlaneStorage->polyPlanes[index].textures[1];
-    poly.textures[2] = polyPlaneStorage->polyPlanes[index].textures[2];
-    poly.textures[3] = polyPlaneStorage->polyPlanes[index].textures[3];
-    poly.textures[4] = polyPlaneStorage->polyPlanes[index].textures[4];
-    poly.textures[5] = polyPlaneStorage->polyPlanes[index].textures[5];
-
-    polyPlaneStorage->polyPlanes[index] = poly;
-    polyPlaneStorage->polyVerts[index] = CreatePolyVertexFromPolyPlane(&poly);
-
-    // reload the dynamic vertex buffer
-    gDynamicVertexBuffer.used = 0;
-    gDynamicVertexBuffer.verticesCount = 0;
-    for(i32 i = 0; i < polyPlaneStorage->polygonsCount; ++i)
-    {
-        PushPolyVertexToVertexBuffer(polyPlaneStorage->polyVerts + i);
-    }
-    */
-}
-
-i32 ViewAddPolyPlane()
-{
-    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
-    Poly2DStorage *frontStorage = gSharedMemory.poly2dStorage + VIEW_FRONT;
-    Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
-
-    ASSERT((polyPlaneStorage->polygonsCount + 1) < ARRAY_LENGTH(polyPlaneStorage->polyPlanes));
-    i32 index = polyPlaneStorage->polygonsCount++;
-
-    PolyVertex2D *frontVert = frontStorage->polyVerts + index;
-    PolyVertex2D *sideVert  = sideStorage->polyVerts  + index;
-
-    Poly2D *front = &frontVert->polygons[0]; 
-    Poly2D *side = &sideVert->polygons[0]; 
+    Poly2D *front = &frontBrush->polygons[0]; 
+    Poly2D *side = &sideBrush->polygons[0]; 
 
     Vec2 xDim = {FLT_MAX, -FLT_MAX}; 
     Vec2 yDim = {FLT_MAX, -FLT_MAX}; 
@@ -1039,24 +903,24 @@ i32 ViewAddPolyPlane()
         }
     }
 
-    PolyPlane poly = CreatePolyPlane(xDim, yDim, zDim);
-    poly.textures[0] = gCurrentTexture;
-    poly.textures[1] = gCurrentTexture;
-    poly.textures[2] = gCurrentTexture;
-    poly.textures[3] = gCurrentTexture;
-    poly.textures[4] = gCurrentTexture;
-    poly.textures[5] = gCurrentTexture;
-    polyPlaneStorage->polyPlanes[index] = poly;
-    polyPlaneStorage->polyVerts[index] = CreatePolyVertexFromPolyPlane(&poly);
-    PushPolyVertexToVertexBuffer(polyPlaneStorage->polyVerts + index);
+    BrushPlane brushPlane = CreateBrushPlane(xDim, yDim, zDim);
+    brushPlane.textures[0] = gCurrentTexture;
+    brushPlane.textures[1] = gCurrentTexture;
+    brushPlane.textures[2] = gCurrentTexture;
+    brushPlane.textures[3] = gCurrentTexture;
+    brushPlane.textures[4] = gCurrentTexture;
+    brushPlane.textures[5] = gCurrentTexture;
+    brushStorage->brushPlanes[index] = brushPlane;
+    brushStorage->brushVerts[index] = CreateBrushVertexFromBrushPlane(&brushPlane);
+    PushBrushVertexToVertexBuffer(brushStorage->brushVerts + index);
 
     return index;
 }
 
 // TODO: IMPORTANT dont forget to free this
-i32 ViewAddPolyVertex2D(View *view, Vec2 start, Vec2 end)
+i32 ViewAddBrush2D(View *view, Vec2 start, Vec2 end)
 {
-    Poly2DStorage *poly2dStorage = ViewGetPoly2DStorage(view);
+    Brush2DStorage *brush2dStorage = ViewGetBrush2DStorage(view);
 
     Poly2D poly = {};
     
@@ -1072,23 +936,23 @@ i32 ViewAddPolyVertex2D(View *view, Vec2 start, Vec2 end)
 
     poly.color = 0xFFFFFFAA;
 
-    PolyVertex2D polyVert = {};
-    DarrayPush(polyVert.polygons, poly, Poly2D);
-    DarrayPush(poly2dStorage->polyVerts, polyVert, PolyVertex2D);
+    Brush2D brush = {};
+    DarrayPush(brush.polygons, poly, Poly2D);
+    DarrayPush(brush2dStorage->brushes, brush, Brush2D);
 
-    i32 index = DarraySize(poly2dStorage->polyVerts) - 1;
+    i32 index = DarraySize(brush2dStorage->brushes) - 1;
 
     return index;
 }
 
 // TODO: mabye change the name of this function (this is only use when we add more brushes)
-void ViewUpdatePolyVertex2D(View *view, Vec2 start, Vec2 end, i32 index)
+void ViewUpdateBrush2D(View *view, Vec2 start, Vec2 end, i32 index)
 {
-    Poly2DStorage *poly2dStorage = ViewGetPoly2DStorage(view);
+    Brush2DStorage *brush2dStorage = ViewGetBrush2DStorage(view);
 
-    PolyVertex2D *polyVert = poly2dStorage->polyVerts + index;
+    Brush2D *brush = brush2dStorage->brushes + index;
 
-    Poly2D *poly = &polyVert->polygons[0];
+    Poly2D *poly = &brush->polygons[0];
 
     // TODO: fix this
     ASSERT(DarraySize(poly->vertices) >= 4);
@@ -1100,13 +964,13 @@ void ViewUpdatePolyVertex2D(View *view, Vec2 start, Vec2 end, i32 index)
     poly->color = 0xFFFFFFAA;
 }
 
-void RenderPolyVertex2D(View *view, PolyVertex2D *polyVert)
+void RenderBrush2D(View *view, Brush2D *brush)
 {
     ViewOrthoState *state = &view->orthoState;
 
-    for(i32 j = 0; j < DarraySize(polyVert->polygons); ++j)
+    for(i32 j = 0; j < DarraySize(brush->polygons); ++j)
     {
-        Poly2D *poly = polyVert->polygons + j;
+        Poly2D *poly = brush->polygons + j;
         u32 color = poly->color;
         for(i32 i = 0; i < DarraySize(poly->vertices) - 1; ++i)
         {
@@ -1129,13 +993,13 @@ void RenderPolyVertex2D(View *view, PolyVertex2D *polyVert)
     }
 }
 
-void RenderPolyVertex2DColor(View *view, PolyVertex2D *polyVert, u32 color)
+void RenderBrush2DColor(View *view, Brush2D *brush, u32 color)
 {
     ViewOrthoState *state = &view->orthoState;
 
-    for(i32 j = 0; j < DarraySize(polyVert->polygons); ++j)
+    for(i32 j = 0; j < DarraySize(brush->polygons); ++j)
     {
-        Poly2D *poly = polyVert->polygons + j;
+        Poly2D *poly = brush->polygons + j;
         for(i32 i = 0; i < DarraySize(poly->vertices) - 1; ++i)
         {
             Vec2 a = poly->vertices[i + 0];

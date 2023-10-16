@@ -115,8 +115,8 @@ void EditorModeAddPoly(View *view)
             f32 startX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
             f32 startY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
             state->startP = {startX, startY};
-            state->quadIndex = ViewAddPolyVertex2D(view, state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize});
-            state->addOtherViewsPolys(state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize}, 0xFFFFFFAA);
+            state->quadIndex = ViewAddBrush2D(view, state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize});
+            state->addOtherViewsBrush(state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize}, 0xFFFFFFAA);
         }
         
         if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown)
@@ -130,9 +130,9 @@ void EditorModeAddPoly(View *view)
             state->rect.min.y = Min(state->startP.y, state->endP.y);
             state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
             state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
-            ViewUpdatePolyVertex2D(view, state->rect.min, state->rect.max, state->quadIndex);
-            state->updateOtherViewsPolys(state->rect, state->quadIndex, 0xFFFFFFAA);
-            ViewAddPolyPlane();
+            ViewUpdateBrush2D(view, state->rect.min, state->rect.max, state->quadIndex);
+            state->updateOtherViewsBrush(state->rect, state->quadIndex, 0xFFFFFFAA);
+            ViewAddBrushPlane();
             gSharedMemory.selectedPolygon = state->quadIndex;
             gCurrentEditorMode = EDITOR_MODE_MODIFY_POLY;
         }
@@ -149,8 +149,8 @@ void EditorModeAddPoly(View *view)
             state->rect.min.y = Min(state->startP.y, state->endP.y);
             state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
             state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
-            ViewUpdatePolyVertex2D(view, state->rect.min, state->rect.max, state->quadIndex);
-            state->updateOtherViewsPolys(state->rect, state->quadIndex, 0xFFFFFFAA);
+            ViewUpdateBrush2D(view, state->rect.min, state->rect.max, state->quadIndex);
+            state->updateOtherViewsBrush(state->rect, state->quadIndex, 0xFFFFFFAA);
         }
     }
 }
@@ -213,13 +213,13 @@ void EditorModeClipping(View *view)
     ViewOrthoState *state = &view->orthoState;
 
     i32 selectedPoly = gSharedMemory.selectedPolygon;
-    Poly2DStorage *viewStorage = ViewGetPoly2DStorage(view);
+    Brush2DStorage *viewStorage = ViewGetBrush2DStorage(view);
 
-    if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->polyVerts))
+    if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->brushes))
         return;
 
-    PolyVertex2D *polyVert = viewStorage->polyVerts + selectedPoly;
-    RenderPolyVertex2DColor(view , polyVert, 0xFF0000FF);
+    Brush2D *brush = viewStorage->brushes + selectedPoly;
+    RenderBrush2DColor(view , brush, 0xFF0000FF);
 
     if(!MouseIsHot(view))
         return;
@@ -325,8 +325,8 @@ void EditorModeClipping(View *view)
         // a function that return the correct plane depending on the view you use to
         // create the clipping plane
         Plane clipPlane = state->createViewClipPlane(state->startP, state->endP);
-        ViewClipPolyVertex(selectedPoly, clipPlane, view->id);
-        ViewUpdatePolyVertex2DFromPolyPlane(selectedPoly);
+        ViewClipBrush(selectedPoly, clipPlane, view->id);
+        ViewUpdateBrush2DFromBrushPlane(selectedPoly);
     }
 }
 
@@ -335,29 +335,25 @@ void EditorModeModifyPoly(View *view)
     if(gCurrentEditorMode != EDITOR_MODE_MODIFY_POLY)
         return;
 
-    //if(!MouseIsHot(view)) 
-    //    return;
-
-
     ViewOrthoState *state = &view->orthoState;
 
     i32 selectedPoly = gSharedMemory.selectedPolygon;
 
-    PolyPlaneStorage *polyPlaneStorage = &gSharedMemory.polyPlaneStorage;
-    Poly2DStorage *viewStorage = ViewGetPoly2DStorage(view);
+    BrushStorage *brushStorage = &gSharedMemory.brushStorage;
+    Brush2DStorage *viewStorage = ViewGetBrush2DStorage(view);
 
 
-    if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->polyVerts))
+    if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->brushes))
         return;
 
     // Get Min and Max
     Vec2 xDim = {FLT_MAX, -FLT_MAX}; 
     Vec2 yDim = {FLT_MAX, -FLT_MAX}; 
 
-    PolyVertex2D *polyVert = viewStorage->polyVerts + selectedPoly;
-    for(i32 j = 0; j < DarraySize(polyVert->polygons); ++j)
+    Brush2D *brush = viewStorage->brushes + selectedPoly;
+    for(i32 j = 0; j < DarraySize(brush->polygons); ++j)
     {
-        Poly2D *poly = polyVert->polygons + j;
+        Poly2D *poly = brush->polygons + j;
 
         for(i32 i = 0; i < DarraySize(poly->vertices); ++i)
         {
@@ -520,10 +516,10 @@ void EditorModeModifyPoly(View *view)
         f32 xNewDim = topR.x - botL.x; 
         f32 yNewDim = topR.y - botL.y;
 
-        PolyVertex *polyVert = polyPlaneStorage->polyVerts + selectedPoly;
-        for(i32 j = 0; j < polyVert->polygonsCount; ++j)
+        BrushVertex *brushVert = brushStorage->brushVerts + selectedPoly;
+        for(i32 j = 0; j < brushVert->polygonsCount; ++j)
         {
-            Poly3D *poly = polyVert->polygons + j;
+            Poly3D *poly = brushVert->polygons + j;
             for(i32 i = 0; i < poly->verticesCount; ++i)
             {
                 Vertex *v = poly->vertices + i;
@@ -559,13 +555,8 @@ void EditorModeModifyPoly(View *view)
         }
 
 
-        ViewUpdatePolyPlaneFromPolyVertex(selectedPoly);
-        ViewUpdatePolyVertex2DFromPolyPlane(selectedPoly);
-        
-        // TODO: see if this function is still in use
-        //ViewUpdateQuad(view, state->rect.min, state->rect.max, selectedPoly);
-        //state->updateOtherViewsPolys(state->rect, selectedPoly, 0xFFFFFFAA);
-        //ViewUpdatePolyPlane(selectedPoly);
+        ViewUpdateBrushPlaneFromBrushVertex(selectedPoly);
+        ViewUpdateBrush2DFromBrushPlane(selectedPoly);
     }
 }
 
@@ -617,14 +608,14 @@ i32 MousePicking2D(View *view)
     ScreenToWorld(mouseRelX, mouseRelY, mouseWorldX, mouseWorldY,
                   state->offsetX, state->offsetY, state->zoom);
 
-    Poly2DStorage *viewStorage = ViewGetPoly2DStorage(view);
-    for(i32 j = 0; j < DarraySize(viewStorage->polyVerts); ++j)
+    Brush2DStorage *viewStorage = ViewGetBrush2DStorage(view);
+    for(i32 j = 0; j < DarraySize(viewStorage->brushes); ++j)
     {
-        PolyVertex2D *polyVert = viewStorage->polyVerts + j;
+        Brush2D *brush = viewStorage->brushes + j;
         // loop over every polygon in the list
-        for(i32 i = 0; i < DarraySize(polyVert->polygons); ++i)
+        for(i32 i = 0; i < DarraySize(brush->polygons); ++i)
         {
-            Poly2D *poly = polyVert->polygons + i;
+            Poly2D *poly = brush->polygons + i;
             if(PointHitPoly2D(poly, mouseWorldX, mouseWorldY, state->zoom))
             {
                 return j;
@@ -659,7 +650,7 @@ static Ray GetMouseRay(View *view, f32 x, f32 y)
     return ray;
 }
 
-static bool RayHitPolyPlane(Ray ray, PolyPlane *poly, f32 *tOut)
+static bool RayHitBrushPlane(Ray ray, BrushPlane *brushPlane, f32 *tOut)
 {
     Vec3 a = ray.o;
     Vec3 d = ray.d;
@@ -668,9 +659,9 @@ static bool RayHitPolyPlane(Ray ray, PolyPlane *poly, f32 *tOut)
     f32 tFirst = 0;
     f32 tLast = FLT_MAX;
     // intersect segment agains each plane
-    for(i32 i = 0; i < poly->planesCount; ++i)
+    for(i32 i = 0; i < brushPlane->planesCount; ++i)
     {
-        Plane p = poly->planes[i];
+        Plane p = brushPlane->planes[i];
         f32 denom = Vec3Dot(p.n, d);
         f32 dist = (p.d / g3DScale) - Vec3Dot(p.n, a);
         // test if segment runs parallel to tha plane
@@ -702,7 +693,7 @@ static bool RayHitPolyPlane(Ray ray, PolyPlane *poly, f32 *tOut)
 
 i32 MousePicking3D(View *view)
 {
-    PolyPlaneStorage *viewStorage = &gSharedMemory.polyPlaneStorage; 
+    BrushStorage *viewStorage = &gSharedMemory.brushStorage; 
 
     // get the mouse relative to the view but from the bottom up
     i32 mouseRelX = MouseRelX(view) + view->w * 0.5f;
@@ -714,11 +705,11 @@ i32 MousePicking3D(View *view)
     // the smallest t value
     f32 tMin = FLT_MAX;
     i32 hitIndex = -1;
-    for(i32 i = 0; i < viewStorage->polygonsCount; ++i)
+    for(i32 i = 0; i < viewStorage->brushesCount; ++i)
     {
-        PolyPlane *poly = viewStorage->polyPlanes + i;
+        BrushPlane *brushPlane = viewStorage->brushPlanes + i;
         f32 t = -1.0f;
-        if(RayHitPolyPlane(ray, poly, &t))
+        if(RayHitBrushPlane(ray, brushPlane, &t))
         {
             if(t < tMin)
             {
@@ -757,6 +748,6 @@ void EditorModeSetTexture(View *view)
     {
         i32 clickPolygon = view->mousePicking(view);
         printf("change texture of the polygon: %d\n", clickPolygon);
-        PolyPlaneStorage *viewStorage = &gSharedMemory.polyPlaneStorage; 
+        BrushStorage *viewStorage = &gSharedMemory.brushStorage; 
     }
 }

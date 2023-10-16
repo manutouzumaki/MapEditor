@@ -215,8 +215,6 @@ int main()
         // Render View To Main Back Buffer
         ViewManagerRenderViews(&vm, &cbuffer, clientRect);
 
-        // TODO: render texture atlas to test if work correctly
-        
         // Render GUI
         RenderImGui();
         PresentImGui();

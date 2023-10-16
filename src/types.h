@@ -150,7 +150,7 @@ struct Poly2D
     u32 color;
 };
 
-struct PolyPlane
+struct BrushPlane
 {
     Plane planes[64];
     TextureAxisNormal axisNormals[64];
@@ -158,34 +158,34 @@ struct PolyPlane
     i32 planesCount;
 };
 
-struct PolyVertex
+struct BrushVertex
 {
     Poly3D polygons[64];
     i32 polygonsCount;
 };
 
-struct PolyVertex2D
+struct Brush2D
 {
     Poly2D *polygons;
 };
 
 // TODO: use a link list base storage system
-struct Poly2DStorage
+struct Brush2DStorage
 {
-    PolyVertex2D *polyVerts;
+    Brush2D *brushes;
 };
 
-struct PolyPlaneStorage
+struct BrushStorage
 {
-    PolyPlane polyPlanes[64];
-    PolyVertex polyVerts[64];
-    i32 polygonsCount;
+    BrushPlane brushPlanes[64];
+    BrushVertex brushVerts[64];
+    i32 brushesCount;
 };
 
 struct SharedMemory
 {
-    Poly2DStorage poly2dStorage[3];
-    PolyPlaneStorage polyPlaneStorage;
+    Brush2DStorage brush2dStorage[3];
+    BrushStorage brushStorage;
 
     i32 selectedPolygon = -1;
 };

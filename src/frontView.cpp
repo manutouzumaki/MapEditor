@@ -1,6 +1,6 @@
-static void AddSideAndTopViewsPolys(Vec2 startP, Vec2 endP, u32 color)
+static void AddSideAndTopViewsBrush(Vec2 startP, Vec2 endP, u32 color)
 {
-    Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE;
+    Brush2DStorage *sideStorage = gSharedMemory.brush2dStorage + VIEW_SIDE;
 
     Poly2D poly = {};
     Vec2 a = {0, endP.y};
@@ -13,11 +13,11 @@ static void AddSideAndTopViewsPolys(Vec2 startP, Vec2 endP, u32 color)
     DarrayPush(poly.vertices, d, Vec2);
     poly.color = color;
 
-    PolyVertex2D polyVert = {};
-    DarrayPush(polyVert.polygons, poly, Poly2D);
-    DarrayPush(sideStorage->polyVerts, polyVert, PolyVertex2D);
+    Brush2D brush = {};
+    DarrayPush(brush.polygons, poly, Poly2D);
+    DarrayPush(sideStorage->brushes, brush, Brush2D);
      
-    Poly2DStorage *topStorage = gSharedMemory.poly2dStorage + VIEW_TOP;
+    Brush2DStorage *topStorage = gSharedMemory.brush2dStorage + VIEW_TOP;
 
     poly = {};
     a = {startP.x, gUnitSize};
@@ -30,24 +30,24 @@ static void AddSideAndTopViewsPolys(Vec2 startP, Vec2 endP, u32 color)
     DarrayPush(poly.vertices, d, Vec2);
     poly.color = color;
 
-    polyVert = {};
-    DarrayPush(polyVert.polygons, poly, Poly2D);
-    DarrayPush(topStorage->polyVerts, polyVert, PolyVertex2D);
+    brush = {};
+    DarrayPush(brush.polygons, poly, Poly2D);
+    DarrayPush(topStorage->brushes, brush, Brush2D);
 }
 
-static void UpdateSideAndTopViewsPolys(RectMinMax rect, i32 quadIndex, u32 color)
+static void UpdateSideAndTopViewsBrush(RectMinMax rect, i32 quadIndex, u32 color)
 {
-    Poly2DStorage *sideStorage = gSharedMemory.poly2dStorage + VIEW_SIDE; 
-    PolyVertex2D *polyVert = sideStorage->polyVerts + quadIndex;
-    Poly2D *poly = &polyVert->polygons[0];
+    Brush2DStorage *sideStorage = gSharedMemory.brush2dStorage + VIEW_SIDE; 
+    Brush2D *brush = sideStorage->brushes + quadIndex;
+    Poly2D *poly = &brush->polygons[0];
     poly->vertices[0] = {poly->vertices[0].x, rect.max.y};
     poly->vertices[1] = {poly->vertices[1].x, rect.max.y};
     poly->vertices[2] = {poly->vertices[2].x, rect.min.y};
     poly->vertices[3] = {poly->vertices[3].x, rect.min.y};
     
-    Poly2DStorage *topStorage = gSharedMemory.poly2dStorage + VIEW_TOP;
-    polyVert = topStorage->polyVerts + quadIndex;
-    poly = &polyVert->polygons[0];
+    Brush2DStorage *topStorage = gSharedMemory.brush2dStorage + VIEW_TOP;
+    brush = topStorage->brushes + quadIndex;
+    poly = &brush->polygons[0];
     poly->vertices[0] = {rect.min.x, poly->vertices[0].y};
     poly->vertices[1] = {rect.max.x, poly->vertices[1].y};
     poly->vertices[2] = {rect.max.x, poly->vertices[2].y};
@@ -68,8 +68,8 @@ void SetupFrontView(View *view)
     view->id = VIEW_FRONT;
     ViewOrthoState *state = &view->orthoState;
     ViewOrthoBaseSetup(view);
-    state->addOtherViewsPolys = AddSideAndTopViewsPolys;
-    state->updateOtherViewsPolys = UpdateSideAndTopViewsPolys;
+    state->addOtherViewsBrush = AddSideAndTopViewsBrush;
+    state->updateOtherViewsBrush = UpdateSideAndTopViewsBrush;
     state->createViewClipPlane = CreateFrontClipPlane;
     state->controlPointDown = -1;
     state->planeCreated = false;
@@ -91,11 +91,11 @@ void RenderFrontView(View *view)
     ViewOrthoState *state = &view->orthoState;
     ViewOrthoBaseRender(view);
 
-    Poly2DStorage *poly2dStorage = ViewGetPoly2DStorage(view);
-    for(i32 i = 0; i  < DarraySize(poly2dStorage->polyVerts); ++i)
+    Brush2DStorage *brush2dStorage = ViewGetBrush2DStorage(view);
+    for(i32 i = 0; i  < DarraySize(brush2dStorage->brushes); ++i)
     {
-        PolyVertex2D *polyVert = poly2dStorage->polyVerts + i;
-        RenderPolyVertex2D(view ,polyVert);
+        Brush2D *brush = brush2dStorage->brushes + i;
+        RenderBrush2D(view , brush);
     }
     LineRendererDraw();
 }

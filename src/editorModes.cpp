@@ -115,8 +115,34 @@ void EditorModeAddPoly(View *view)
             f32 startX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
             f32 startY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
             state->startP = {startX, startY};
-            state->quadIndex = ViewAddBrush2D(view, state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize});
-            state->addOtherViewsBrush(state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize}, 0xFFFFFFAA);
+
+            //state->quadIndex = ViewAddBrush2D(view, state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize});
+            //state->addOtherViewsBrush(state->startP, {state->startP.x + gUnitSize, state->startP.y + gUnitSize}, 0xFFFFFFAA);
+        }
+
+        if(state->leftButtonDown)
+        {
+            //  update the end position every frame to get real time
+            //  response to moving the mouse
+            f32 endX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
+            f32 endY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
+            state->endP = {endX, endY};
+
+            state->rect.min.x = Min(state->startP.x, state->endP.x);
+            state->rect.min.y = Min(state->startP.y, state->endP.y);
+            state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
+            state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
+
+            // TODO: here we dont have to add the Entity, we can just draw a rectangle in the 2d views
+            Vec2 botL = {state->rect.min.x, state->rect.min.y};
+            Vec2 botR = {state->rect.max.x, state->rect.min.y};
+            Vec2 topL = {state->rect.min.x, state->rect.max.y};
+            Vec2 topR = {state->rect.max.x, state->rect.max.y};
+            //Draw2DQuad(state, botL, botR, topL, topR, 0xFFFFFFAA, -3);
+            Draw2DQuad(state, botL, botR, topL, topR, 0xFF00FF00, -3);
+            
+            //ViewUpdateBrush2D(view, state->rect.min, state->rect.max, state->quadIndex);
+            //state->updateOtherViewsBrush(state->rect, state->quadIndex, 0xFFFFFFAA);
         }
         
         if(MouseJustUp(MOUSE_BUTTON_LEFT) && state->leftButtonDown)
@@ -130,58 +156,19 @@ void EditorModeAddPoly(View *view)
             state->rect.min.y = Min(state->startP.y, state->endP.y);
             state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
             state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
-            ViewUpdateBrush2D(view, state->rect.min, state->rect.max, state->quadIndex);
-            state->updateOtherViewsBrush(state->rect, state->quadIndex, 0xFFFFFFAA);
-            ViewAddBrushPlane();
-            gSharedMemory.selectedPolygon = state->quadIndex;
-            gCurrentEditorMode = EDITOR_MODE_MODIFY_POLY;
-        }
-        
-        if(state->leftButtonDown)
-        {
-            //  update the end position every frame to get real time
-            //  response to moving the mouse
-            f32 endX = floorf(mouseWorldX / gUnitSize) * gUnitSize;
-            f32 endY = floorf(mouseWorldY / gUnitSize) * gUnitSize;
-            state->endP = {endX, endY};
 
-            state->rect.min.x = Min(state->startP.x, state->endP.x);
-            state->rect.min.y = Min(state->startP.y, state->endP.y);
-            state->rect.max.x = Max(state->startP.x, state->endP.x) + gUnitSize;
-            state->rect.max.y = Max(state->startP.y, state->endP.y) + gUnitSize;
-            ViewUpdateBrush2D(view, state->rect.min, state->rect.max, state->quadIndex);
-            state->updateOtherViewsBrush(state->rect, state->quadIndex, 0xFFFFFFAA);
+            gEntityList =  EntityAdd(gEntityList, state->rect.min, state->rect.max, view->id);
+
+            //ViewUpdateBrush2D(view, state->rect.min, state->rect.max, state->quadIndex);
+            //state->updateOtherViewsBrush(state->rect, state->quadIndex, 0xFFFFFFAA);
+            //ViewAddBrushPlane();
+            //gSharedMemory.selectedPolygon = state->quadIndex;
+            
+            gSelectedEntity = gEntityList;
+            gCurrentEditorMode = EDITOR_MODE_MODIFY_POLY;
+            gDirtyFlag = true;
         }
     }
-}
-
-void Draw2DQuad(ViewOrthoState *state, Vec2 botL, Vec2 botR, Vec2 topL, Vec2 topR, u32 color, i32 zIndex)
-{
-        Vec2 a = botL;
-        Vec2 b = topL;
-        f32 sax, say, sbx, sby;
-        WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
-        WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
-        DrawLine(sax,  say, zIndex, sbx,  sby, zIndex, color);
-
-        a = botL;
-        b = botR;
-        WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
-        WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
-        DrawLine(sax,  say, zIndex, sbx,  sby, zIndex, color);
-
-        a = topL;
-        b = topR;
-        WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
-        WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
-        DrawLine(sax,  say, zIndex, sbx,  sby, zIndex, color);
-
-
-        a = botR;
-        b = topR;
-        WorldToScreen(a.x, a.y, sax, say, state->offsetX, state->offsetY, state->zoom); 
-        WorldToScreen(b.x, b.y, sbx, sby, state->offsetX, state->offsetY, state->zoom); 
-        DrawLine(sax,  say, zIndex, sbx,  sby, zIndex, color);
 }
 
 bool MouseInControlPoint(View *view, Vec2 rect)
@@ -212,13 +199,17 @@ void EditorModeClipping(View *view)
 
     ViewOrthoState *state = &view->orthoState;
 
-    i32 selectedPoly = gSharedMemory.selectedPolygon;
-    Brush2DStorage *viewStorage = ViewGetBrush2DStorage(view);
+    //i32 selectedPoly = gSharedMemory.selectedPolygon;
+    //Brush2DStorage *viewStorage = ViewGetBrush2DStorage(view);
 
-    if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->brushes))
-        return;
+    //if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->brushes))
+    //    return;
 
-    Brush2D *brush = viewStorage->brushes + selectedPoly;
+    ASSERT(gSelectedEntity != nullptr);
+
+    Brush2D *brush = &gSelectedEntity->brushes2D[view->id];
+
+    //Brush2D *brush = viewStorage->brushes + selectedPoly;
     RenderBrush2DColor(view , brush, 0xFF0000FF);
 
     if(!MouseIsHot(view))
@@ -324,9 +315,13 @@ void EditorModeClipping(View *view)
     {
         // a function that return the correct plane depending on the view you use to
         // create the clipping plane
+
         Plane clipPlane = state->createViewClipPlane(state->startP, state->endP);
-        ViewClipBrush(selectedPoly, clipPlane, view->id);
-        ViewUpdateBrush2DFromBrushPlane(selectedPoly);
+        EntityClip(gSelectedEntity, view->id, clipPlane);
+        gDirtyFlag = true;
+
+        // ViewClipBrush(selectedPoly, clipPlane, view->id);
+        // ViewUpdateBrush2DFromBrushPlane(selectedPoly);
     }
 }
 
@@ -337,24 +332,27 @@ void EditorModeModifyPoly(View *view)
 
     ViewOrthoState *state = &view->orthoState;
 
-    i32 selectedPoly = gSharedMemory.selectedPolygon;
+    //i32 selectedPoly = gSharedMemory.selectedPolygon;
 
-    BrushStorage *brushStorage = &gSharedMemory.brushStorage;
-    Brush2DStorage *viewStorage = ViewGetBrush2DStorage(view);
+    //BrushStorage *brushStorage = &gSharedMemory.brushStorage;
+    //Brush2DStorage *viewStorage = ViewGetBrush2DStorage(view);
 
 
-    if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->brushes))
-        return;
+    //if(selectedPoly < 0 || selectedPoly >= DarraySize(viewStorage->brushes))
+    //    return;
+
+    ASSERT(gSelectedEntity != nullptr);
 
     // Get Min and Max
     Vec2 xDim = {FLT_MAX, -FLT_MAX}; 
     Vec2 yDim = {FLT_MAX, -FLT_MAX}; 
 
-    Brush2D *brush = viewStorage->brushes + selectedPoly;
+    //Brush2D *brush = viewStorage->brushes + selectedPoly;
+    Brush2D *brush = &gSelectedEntity->brushes2D[view->id];
+
     for(i32 j = 0; j < DarraySize(brush->polygons); ++j)
     {
         Poly2D *poly = brush->polygons + j;
-
         for(i32 i = 0; i < DarraySize(poly->vertices); ++i)
         {
             Vec2 vert = poly->vertices[i];
@@ -367,9 +365,7 @@ void EditorModeModifyPoly(View *view)
             if(vert.y >= yDim.y)
                 yDim.y = vert.y;
         }
-
     }
-
 
     Vec2 botL = {xDim.x, yDim.x};
     Vec2 botR = {xDim.y, yDim.x};
@@ -513,10 +509,14 @@ void EditorModeModifyPoly(View *view)
         state->rect.max.x = topR.x;
         state->rect.max.y = topR.y;
 
-        f32 xNewDim = topR.x - botL.x; 
-        f32 yNewDim = topR.y - botL.y;
+        // f32 xNewDim = topR.x - botL.x; 
+        // f32 yNewDim = topR.y - botL.y;
 
-        BrushVertex *brushVert = brushStorage->brushVerts + selectedPoly;
+        EntityUpdate(gSelectedEntity, view->id, oBotL, oBotR, oTopL, oTopR, botL,  botR,  topL,  topR);
+        gDirtyFlag = true;
+
+        //BrushVertex *brushVert = brushStorage->brushVerts + selectedPoly;
+        /* 
         for(i32 j = 0; j < DarraySize(brushVert->polygons); ++j)
         {
             Poly3D *poly = brushVert->polygons + j;
@@ -557,6 +557,7 @@ void EditorModeModifyPoly(View *view)
 
         ViewUpdateBrushPlaneFromBrushVertex(selectedPoly);
         ViewUpdateBrush2DFromBrushPlane(selectedPoly);
+        */
     }
 }
 
@@ -596,7 +597,8 @@ bool PointHitPoly2D(Poly2D *poly, f32 x, f32 y, f32 zoom)
     return false;
 }
 
-i32 MousePicking2D(View *view)
+//i32 MousePicking2D(View *view)
+Entity *MousePicking2D(View *view)
 {
 
     ViewOrthoState *state = &view->orthoState;
@@ -608,6 +610,7 @@ i32 MousePicking2D(View *view)
     ScreenToWorld(mouseRelX, mouseRelY, mouseWorldX, mouseWorldY,
                   state->offsetX, state->offsetY, state->zoom);
 
+    /*
     Brush2DStorage *viewStorage = ViewGetBrush2DStorage(view);
     for(i32 j = 0; j < DarraySize(viewStorage->brushes); ++j)
     {
@@ -622,7 +625,26 @@ i32 MousePicking2D(View *view)
             }
         }
     }
-    return -1;
+    */
+    Entity *entity = gEntityList;
+    while(entity)
+    {
+        
+        Brush2D *brush = &entity->brushes2D[view->id];
+        // loop over every polygon in the list
+        for(i32 i = 0; i < DarraySize(brush->polygons); ++i)
+        {
+            Poly2D *poly = brush->polygons + i;
+            if(PointHitPoly2D(poly, mouseWorldX, mouseWorldY, state->zoom))
+            {
+                return entity;
+            }
+        }
+
+        entity = entity->next;
+    }
+    return nullptr;
+    // return -1;
 }
 
 static Ray GetMouseRay(View *view, f32 x, f32 y) 
@@ -691,9 +713,10 @@ static bool RayHitBrushPlane(Ray ray, BrushPlane *brushPlane, f32 *tOut)
     return 1;
 }
 
-i32 MousePicking3D(View *view)
+//i32 MousePicking3D(View *view)
+Entity *MousePicking3D(View *view)
 {
-    BrushStorage *viewStorage = &gSharedMemory.brushStorage; 
+    //BrushStorage *viewStorage = &gSharedMemory.brushStorage; 
 
     // get the mouse relative to the view but from the bottom up
     i32 mouseRelX = MouseRelX(view) + view->w * 0.5f;
@@ -704,7 +727,9 @@ i32 MousePicking3D(View *view)
     // loop over every polygon in the list and save the hitPoint with
     // the smallest t value
     f32 tMin = FLT_MAX;
-    i32 hitIndex = -1;
+    //i32 hitIndex = -1;
+    Entity *hitEntity = nullptr;
+    /*
     for(i32 i = 0; i < viewStorage->brushesCount; ++i)
     {
         BrushPlane *brushPlane = viewStorage->brushPlanes + i;
@@ -718,9 +743,26 @@ i32 MousePicking3D(View *view)
             }
         }
     }
+    */
+    Entity *entity = gEntityList;
+    while(entity)
+    {
+        BrushPlane *brushPlane = &entity->brushPlane;
+        f32 t = -1.0f;
+        if(RayHitBrushPlane(ray, brushPlane, &t))
+        {
+            if(t < tMin)
+            {
+                tMin = t;
+                //hitIndex = i;
+                hitEntity = entity;
+            }
+        }
+        entity = entity->next;
+    }
 
-
-    return hitIndex;
+    // return hitIndex;
+    return hitEntity;
 }
 
 void EditorModeSelectPoly(View *view)
@@ -730,8 +772,10 @@ void EditorModeSelectPoly(View *view)
 
     if(MouseIsHot(view) && MouseJustDown(MOUSE_BUTTON_LEFT))
     {
-        gSharedMemory.selectedPolygon = view->mousePicking(view);
-        if(gSharedMemory.selectedPolygon >= 0)
+        //gSharedMemory.selectedPolygon = view->mousePicking(view);
+        gSelectedEntity = view->mousePicking(view);
+        //if(gSharedMemory.selectedPolygon >= 0)
+        if(gSelectedEntity != nullptr)
         {
             gCurrentEditorMode = EDITOR_MODE_MODIFY_POLY;
         }
@@ -744,10 +788,12 @@ void EditorModeSetTexture(View *view)
     if(gCurrentEditorMode != EDITOR_MODE_SET_TEXTURE)
         return;
 
+    /*
     if(MouseIsHot(view) && MouseJustDown(MOUSE_BUTTON_LEFT))
     {
         i32 clickPolygon = view->mousePicking(view);
         printf("change texture of the polygon: %d\n", clickPolygon);
         BrushStorage *viewStorage = &gSharedMemory.brushStorage; 
     }
+    */
 }

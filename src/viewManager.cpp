@@ -167,6 +167,22 @@ void ViewManagerProcessAndRenderToViews(ViewManager *vm)
     for(i32 i = 0; i < 4; ++i)
     {
         ViewProcess(views + i);
+
+        // reload the dynamic vertex buffer
+        if(gDirtyFlag == true)
+        {
+            gDirtyFlag = false;
+            gDynamicVertexBuffer.used = 0;
+            gDynamicVertexBuffer.verticesCount = 0;
+            Entity *entity = gEntityList;
+            while(entity)
+            {
+                BrushVertexPushToVertexBuffer(&entity->brushVert);
+                entity = entity->next;
+            }
+        }
+
+
         ViewRender(views + i);
     }
 }
@@ -227,6 +243,14 @@ void ViewManagerRenderViews(ViewManager *vm, CBuffer *cbuffer, Rect clientRect)
 
 void ViewManagerShutDown(ViewManager *vm)
 {
+    Entity *entity = gEntityList;
+    while(entity)
+    {
+        Entity *next = entity->next;
+        EntityDestroy(entity);
+        entity = next;
+    }
+
     View *views = vm->views;
     for(i32 i = 0; i < 4; ++i)
     {

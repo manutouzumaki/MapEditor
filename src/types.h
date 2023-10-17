@@ -143,6 +143,7 @@ struct Poly2D
     u32 color;
 };
 
+/*
 struct Poly3D
 {
     Vertex vertices[256];
@@ -170,38 +171,7 @@ struct Brush2D
 {
     Poly2D *polygons;
 };
-
-// TODO: use a link list base storage system
-struct Entity 
-{
-    BrushPlane brushPlane;
-    BrushVertex brushVert;
-    Brush2D brushes2D[3];
-
-    Entity *next;
-    Entity *prev;
-};
-
-struct Brush2DStorage
-{
-    Brush2D *brushes;
-};
-
-struct BrushStorage
-{
-    BrushPlane brushPlanes[64];
-    BrushVertex brushVerts[64];
-    i32 brushesCount;
-};
-
-struct SharedMemory
-{
-    Brush2DStorage brush2dStorage[3];
-    BrushStorage brushStorage;
-
-    i32 selectedPolygon = -1;
-};
-
+*/
 enum PointToPlane
 {
     POINT_IN_FRONT_OF_PLANE,

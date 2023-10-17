@@ -19,6 +19,9 @@
 #include "darray.h"
 #include "math.h"
 #include "types.h"
+#include "view.h"
+
+#include "brush.h"
 
 // gobals to handle general app and window state
 static bool gRunning;
@@ -41,6 +44,7 @@ static Shader gCol2DShader;
 static Shader gTexShader;
 static Shader gTex2DShader;
 
+static bool gDirtyFlag;
 static ConstBuffer gConstBuffer;
 static VertexBuffer gVertexBuffer;
 static DynamicVertexBuffer gDynamicVertexBuffer;
@@ -85,13 +89,46 @@ enum ControlPoint
 
 // TODO: see what to do with this ones
 static EditorMode gCurrentEditorMode;
-static SharedMemory gSharedMemory;
 static u32 gCurrentTexture;
 
 #include "darray.cpp"
 #include "input.cpp"
 #include "win32.cpp"
 #include "line.cpp"
+#include "utils.cpp"
+
+#include "brush2d.cpp"
+#include "brushPlane.cpp"
+#include "brushVertex.cpp"
+#include "entity.cpp"
+
+/*
+struct Brush2DStorage
+{
+    Brush2D *brushes;
+};
+
+struct BrushStorage
+{
+    BrushPlane brushPlanes[64];
+    BrushVertex brushVerts[64];
+    i32 brushesCount;
+};
+
+struct SharedMemory
+{
+    Brush2DStorage brush2dStorage[3];
+    BrushStorage brushStorage;
+
+    i32 selectedPolygon = -1;
+};
+
+static SharedMemory gSharedMemory;
+*/
+
+static Entity *gSelectedEntity;
+static Entity *gEntityList;
+
 #include "view.cpp"
 #include "editorModes.cpp"
 

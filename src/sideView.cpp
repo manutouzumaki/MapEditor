@@ -1,5 +1,6 @@
 static void AddFrontAndTopViewsBrush(Vec2 startP, Vec2 endP, u32 color)
 {
+    /*
     Brush2DStorage *frontStorage = gSharedMemory.brush2dStorage + VIEW_FRONT;
 
     Poly2D poly = {};
@@ -33,10 +34,12 @@ static void AddFrontAndTopViewsBrush(Vec2 startP, Vec2 endP, u32 color)
     brush = {};
     DarrayPush(brush.polygons, poly, Poly2D);
     DarrayPush(topStorage->brushes, brush, Brush2D);
+    */
 }
 
 static void UpdateFrontAndTopViewsBrush(RectMinMax rect, i32 quadIndex, u32 color)
 {
+    /*
     Brush2DStorage *frontStorage = gSharedMemory.brush2dStorage + VIEW_FRONT; 
     Brush2D *brush = frontStorage->brushes + quadIndex;
     Poly2D *poly = &brush->polygons[0];
@@ -52,6 +55,7 @@ static void UpdateFrontAndTopViewsBrush(RectMinMax rect, i32 quadIndex, u32 colo
     poly->vertices[1] = {poly->vertices[1].x, rect.max.x};
     poly->vertices[2] = {poly->vertices[2].x, rect.min.x};
     poly->vertices[3] = {poly->vertices[3].x, rect.min.x};
+    */
 }
 
 Plane CreateSideClipPlane(Vec2 a, Vec2 b)
@@ -92,11 +96,22 @@ void RenderSideView(View *view)
     ViewOrthoState *state = &view->orthoState;
     ViewOrthoBaseRender(view);
 
+    /*
     Brush2DStorage *brush2dStorage = ViewGetBrush2DStorage(view);
     for(i32 i = 0; i  < DarraySize(brush2dStorage->brushes); ++i)
     {
         Brush2D *brush = brush2dStorage->brushes + i;
         RenderBrush2D(view ,brush);
     }
+    */
+
+    Entity *entity = gEntityList;
+    while(entity)
+    {
+        Brush2D *brush = &entity->brushes2D[view->id];
+        RenderBrush2D(view , brush);
+        entity = entity->next;
+    }
+
     LineRendererDraw();
 }

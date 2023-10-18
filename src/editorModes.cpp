@@ -286,10 +286,12 @@ void EditorModeModifyPoly(View *view)
     if(gCurrentEditorMode != EDITOR_MODE_MODIFY_POLY)
         return;
 
-    ViewOrthoState *state = &view->orthoState;
+    if(gSelectedEntity == nullptr) 
+        return;
 
     ASSERT(gSelectedEntity != nullptr);
 
+    ViewOrthoState *state = &view->orthoState;
     // Get Min and Max
     Vec2 xDim = {FLT_MAX, -FLT_MAX}; 
     Vec2 yDim = {FLT_MAX, -FLT_MAX}; 
@@ -353,7 +355,6 @@ void EditorModeModifyPoly(View *view)
     {
         switch(state->controlPointDown)
         {
-            // TODO: we have to move tree vertices
             case CONTROL_POINT_BOTL:
             {
                 controlP[CONTROL_POINT_BOTL].x = currentX;
@@ -452,6 +453,14 @@ void EditorModeModifyPoly(View *view)
         state->controlPointDown = -1;
         EntityUpdate(gSelectedEntity, view->id, oBotL, oBotR, oTopL, oTopR, botL,  botR,  topL,  topR);
         gDirtyFlag = true;
+    }
+
+    if(KeyJustDown(VK_BACK) || KeyJustDown(VK_DELETE))
+    {
+        EntityRemove(gSelectedEntity);
+        gSelectedEntity = nullptr;
+        gDirtyFlag = true;
+        gCurrentEditorMode = EDITOR_MODE_SELECT_POLY;
     }
 }
 

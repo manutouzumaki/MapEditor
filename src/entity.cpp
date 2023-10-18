@@ -91,9 +91,14 @@ Entity *EntityAdd(Entity *front, Vec2 start, Vec2 end, ViewId viewId)
 
 void EntityRemove(Entity *entity)
 {
+    if(gEntityList == entity)
+    {
+        gEntityList = entity->next;
+    }
+
     if(entity->prev != nullptr)
         entity->prev->next = entity->next;
-    if(entity->next != nullptr);
+    if(entity->next != nullptr)
         entity->next->prev = entity->prev;
     EntityDestroy(entity);
 }

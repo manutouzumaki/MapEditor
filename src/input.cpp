@@ -5,7 +5,7 @@ enum MouseButonType
     MOUSE_BUTTON_RIGHT
 };
 
-struct MouseButton
+struct Button
 {
     bool down;
     bool wasDown;
@@ -16,7 +16,9 @@ struct Input
     i32 x;
     i32 y;
     i32 wheelDelta;
-    MouseButton buttons[3];
+    Button buttons[3];
+    Button keys[349];
+
 };
 
 static Input gInput;
@@ -30,6 +32,12 @@ void InputPrepareForFrame()
     if(gInput.buttons[MOUSE_BUTTON_LEFT].down) gInput.buttons[MOUSE_BUTTON_LEFT].wasDown = true;
     if(gInput.buttons[MOUSE_BUTTON_MIDDLE].down) gInput.buttons[MOUSE_BUTTON_MIDDLE].wasDown = true;
     if(gInput.buttons[MOUSE_BUTTON_RIGHT].down) gInput.buttons[MOUSE_BUTTON_RIGHT].wasDown = true;
+
+    for(i32 i = 0; i < ARRAY_LENGTH(gInput.keys); ++i)
+    {
+        gInput.keys[i].wasDown = false;
+        if(gInput.keys[i].down) gInput.keys[i].wasDown = true;
+    }
 }
 
 i32 MouseX()
@@ -80,6 +88,35 @@ bool MouseJustUp(i32 mouseButton)
     if(gInput.buttons[mouseButton].down != gInput.buttons[mouseButton].wasDown)
     {
         if(gInput.buttons[mouseButton].wasDown)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool KeyIsDown(i32 key)
+{
+    return gInput.keys[key].down;
+}
+
+bool KeyJustDown(i32 key)
+{
+    if(gInput.keys[key].down != gInput.keys[key].wasDown)
+    {
+        if(gInput.keys[key].down)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool KeyJustUp(i32 key)
+{
+    if(gInput.keys[key].down != gInput.keys[key].wasDown)
+    {
+        if(gInput.keys[key].wasDown)
         {
             return true;
         }

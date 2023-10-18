@@ -323,6 +323,18 @@ static void FlushEvents(HWND window)
             {
                 gInput.wheelDelta = GET_WHEEL_DELTA_WPARAM(msg.wParam) / 120;
             } break;
+            case WM_KEYDOWN:
+            case WM_SYSKEYDOWN:
+            case WM_KEYUP:
+            case WM_SYSKEYUP: {
+                bool wasDown = ((msg.lParam & (1 << 30)) != 0);
+                bool isDown = ((msg.lParam & (1 << 31)) == 0);
+                if (isDown != wasDown) {
+                    DWORD vkCode = (DWORD)msg.wParam;
+                    gInput.keys[vkCode].down = isDown;
+                }
+            }break;
+
         }
 
         TranslateMessage(&msg);

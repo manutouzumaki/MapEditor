@@ -20,8 +20,9 @@
 #include "math.h"
 #include "types.h"
 #include "view.h"
-
 #include "brush.h"
+#include "entity.h"
+#include "editorModes.h"
 
 // gobals to handle general app and window state
 static bool gRunning;
@@ -60,34 +61,9 @@ static Vertex gQuad[] = {
     {{ 0.5f,  0.5f, 0}, {0, 0, 1}, {0.8, 0.8, 0.8, 1}, {1, 0}}
 };
 
-// global to handle editor state
-enum EditorMode
-{
-    EDITOR_MODE_SELECT_POLY,
-    EDITOR_MODE_ADD_POLY,
-    EDITOR_MODE_MODIFY_POLY,
-    EDITOR_MODE_MOVE_3D_CAMERA,
-    EDITOR_MODE_SET_TEXTURE,
-    EDITOR_MODE_CLIPPING,
-
-    EDITOR_MODE_COUNT
-};
-
-enum ControlPoint
-{
-    CONTROL_POINT_BOTL,
-    CONTROL_POINT_BOTR,
-    CONTROL_POINT_TOPL,
-    CONTROL_POINT_TOPR,
-    CONTROL_POINT_MIDL,
-    CONTROL_POINT_MIDR,
-    CONTROL_POINT_MIDT,
-    CONTROL_POINT_MIDB,
-
-    CONTROL_POINT_COUNT
-};
-
 // TODO: see what to do with this ones
+static Entity *gSelectedEntity;
+static Entity *gEntityList;
 static EditorMode gCurrentEditorMode;
 static u32 gCurrentTexture;
 
@@ -96,49 +72,17 @@ static u32 gCurrentTexture;
 #include "win32.cpp"
 #include "line.cpp"
 #include "utils.cpp"
-
 #include "brush2d.cpp"
 #include "brushPlane.cpp"
 #include "brushVertex.cpp"
 #include "entity.cpp"
-
-/*
-struct Brush2DStorage
-{
-    Brush2D *brushes;
-};
-
-struct BrushStorage
-{
-    BrushPlane brushPlanes[64];
-    BrushVertex brushVerts[64];
-    i32 brushesCount;
-};
-
-struct SharedMemory
-{
-    Brush2DStorage brush2dStorage[3];
-    BrushStorage brushStorage;
-
-    i32 selectedPolygon = -1;
-};
-
-static SharedMemory gSharedMemory;
-*/
-
-static Entity *gSelectedEntity;
-static Entity *gEntityList;
-
 #include "view.cpp"
 #include "editorModes.cpp"
-
 #include "mainView.cpp"
 #include "frontView.cpp"
 #include "topView.cpp"
 #include "sideView.cpp"
-
 #include "viewManager.cpp"
-
 #include "gui.cpp"
 
 void ProcessWindowResize(ViewManager *vm, CBuffer *cbuffer, f32 &clientWidth, Rect &clientRect, Rect &uiRect)

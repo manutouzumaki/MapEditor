@@ -4,12 +4,7 @@ struct Entity;
 typedef void (*SetupFNP) (View *view);
 typedef void (*ProcessFNP) (View *view);
 typedef void (*RenderFNP) (View *view);
-
-typedef void (*AddOtherViewsBrushFNP) (Vec2 start, Vec2 end, u32 color);
-typedef void (*UpdateOtherViewsBrushFNP) (RectMinMax rect, i32 quadIndex, u32 color);
 typedef Plane (*CreateViewClipPlaneFNP) (Vec2 a, Vec2 b);
-
-//typedef i32 (*MousePickingFNP) (View *view);
 typedef Entity *(*MousePickingFNP) (View *view);
 
 
@@ -67,12 +62,7 @@ struct ViewOrthoState
 
     Vec2 startP;
     Vec2 endP;
-    i32 quadIndex;
-    RectMinMax rect;
 
-    // TODO: remove this callbacks
-    AddOtherViewsBrushFNP addOtherViewsBrush;
-    UpdateOtherViewsBrushFNP updateOtherViewsBrush;
     CreateViewClipPlaneFNP createViewClipPlane;
 
 };

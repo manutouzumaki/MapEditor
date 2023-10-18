@@ -1,16 +1,3 @@
-struct Entity 
-{
-    BrushPlane brushPlane;
-    BrushVertex brushVert;
-    Brush2D brushes2D[3];
-
-    u32 key;
-    Entity *next;
-    Entity *prev;
-
-    static u32 entityCount;
-};
-
 u32 Entity::entityCount;
 
 Entity *EntityCreate(Vec2 start, Vec2 end, ViewId viewId)
@@ -53,9 +40,7 @@ Entity *EntityCreate(Vec2 start, Vec2 end, ViewId viewId)
 }
 
 void EntityUpdate(Entity *entity, ViewId viewId,
-                  // TODO: this can be calculated here intead of ask for it//
-                  Vec2 oBotL, Vec2 oBotR, Vec2 oTopL, Vec2 oTopR, ///////////
-                  ///////////////////////////////////////////////////////////
+                  Vec2 oBotL, Vec2 oBotR, Vec2 oTopL, Vec2 oTopR,
                   Vec2 botL,  Vec2 botR,  Vec2 topL,  Vec2 topR)
 {
     BrushVertexUpdate(&entity->brushVert, viewId, oBotL, oBotR, oTopL, oTopR, botL,  botR,  topL,  topR);

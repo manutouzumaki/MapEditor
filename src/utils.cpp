@@ -236,3 +236,227 @@ static void RenderGrid(f32 offsetX, f32 offsetY, f32 zoom)
     DrawLine(sax,  say, 0, sbx,  sby, -1, 0xFFFFAAAA);
 
 }
+
+i32 MouseRelToClientX()
+{
+    i32 mouseRelToClientX = MouseX() - gFixWidth;
+    return mouseRelToClientX;
+}
+
+i32 MouseRelToClientY()
+{
+    i32 mouseRelToClientY = gCurrentWindowHeight - MouseY();
+    return mouseRelToClientY;
+}
+
+i32 MouseRelX(View *view)
+{
+    i32 mouseRelToClientX = MouseRelToClientX();
+    i32 mouseRelX = mouseRelToClientX - view->x;
+    return mouseRelX;
+}
+
+i32 MouseRelY(View *view)
+{
+    i32 mouseRelToClientY = MouseRelToClientY();
+    i32 mouseRelY = mouseRelToClientY - view->y;
+    return mouseRelY;
+}
+
+bool MouseIsHot(View *view)
+{
+    i32 mouseRelX = MouseRelX(view);
+    i32 mouseRelY = MouseRelY(view);
+    if(mouseRelX >= view->w*-0.5f && mouseRelX <= view->w*0.5f &&
+       mouseRelY >= view->h*-0.5f && mouseRelY <= view->h*0.5f)
+    {
+        return true;
+    }
+    return false;
+}
+
+bool PointHitPoly2D(Poly2D *poly, f32 x, f32 y, f32 zoom)
+{
+    Vec2 mouseP = {x, y};
+    for(i32 i = 0; i < DarraySize(poly->vertices); ++i)
+    {
+        if(i == 1)
+            i32 stophere = 1;
+
+        Vec2 a = poly->vertices[(i + 0) % DarraySize(poly->vertices)];
+        Vec2 b = poly->vertices[(i + 1) % DarraySize(poly->vertices)];
+        Vec2 ab = b - a;
+
+        // create the rect orthonormal basis
+        Vec2 o = a + ab * 0.5f;
+        Vec2 r = Vec2Normalized(ab);
+        Vec2 u = Vec2Normalized({-r.y ,r.x});
+        
+
+        // transform the mouse world coord the the rect basis
+        Vec2 testP = mouseP - o;
+        f32 localX = Vec2Dot(r, testP);
+        f32 localY = Vec2Dot(u, testP);
+
+        // AABB point intersection check
+        f32 hW = Vec2Len(ab) * 0.5f;
+        f32 hH = 2*(1.0f/zoom);
+        if(localX >= -hW && localX <= hW &&
+           localY >= -hH && localY <= hH)
+        {
+            return true;
+        }
+
+    }
+    return false;
+}
+
+Entity *MousePicking2D(View *view)
+{
+    ViewOrthoState *state = &view->orthoState;
+
+    i32 mouseRelX = MouseRelX(view);
+    i32 mouseRelY = MouseRelY(view);
+
+    f32 mouseWorldX, mouseWorldY;
+    ScreenToWorld(mouseRelX, mouseRelY, mouseWorldX, mouseWorldY,
+                  state->offsetX, state->offsetY, state->zoom);
+
+    Entity *entity = gEntityList;
+    while(entity)
+    {
+        
+        Brush2D *brush = &entity->brushes2D[view->id];
+        // loop over every polygon in the list
+        for(i32 i = 0; i < DarraySize(brush->polygons); ++i)
+        {
+            Poly2D *poly = brush->polygons + i;
+            if(PointHitPoly2D(poly, mouseWorldX, mouseWorldY, state->zoom))
+            {
+                return entity;
+            }
+        }
+
+        entity = entity->next;
+    }
+
+    return nullptr;
+}
+
+static Ray GetMouseRay(View *view, f32 x, f32 y) 
+{
+    ViewPerspState *state = &view->perspState;
+
+    Mat4 invView = Mat4Inverse(view->cbuffer.view);
+    Mat4 invProj = Mat4Inverse(view->cbuffer.proj);
+
+    Vec4 rayClip;
+    rayClip.x = 2.0f * x / view->w - 1.0f;
+    rayClip.y = 1.0f - (2.0f * y) / view->h;
+    rayClip.z = 1.0f;
+    rayClip.w = 1.0f;
+    Vec4 rayEye = invProj * rayClip;
+    rayEye.z =  1.0f;
+    rayEye.w =  0.0f;
+    Vec4 rayWorld = invView * rayEye;
+    rayWorld = Vec4Normalized(rayWorld);
+
+    Ray ray;
+    ray.o = state->camera.pos;
+    ray.d = {rayWorld.x, rayWorld.y, rayWorld.z};
+    Vec3Normalize(&ray.d);
+    return ray;
+}
+
+static bool RayHitBrushPlane(Ray ray, BrushPlane *brushPlane, f32 *tOut)
+{
+    Vec3 a = ray.o;
+    Vec3 d = ray.d;
+    // Set initial interval to being the whole segment. For a ray, tlast should be
+    // sety to FLT_MAX. For a line tfirst should be set to - FLT_MAX
+    f32 tFirst = 0;
+    f32 tLast = FLT_MAX;
+    // intersect segment agains each plane
+    for(i32 i = 0; i < DarraySize(brushPlane->planes); ++i)
+    {
+        Plane p = brushPlane->planes[i].plane;
+        f32 denom = Vec3Dot(p.n, d);
+        f32 dist = (p.d / g3DScale) - Vec3Dot(p.n, a);
+        // test if segment runs parallel to tha plane
+        if(denom == 0.0f)
+        {
+            // If so, return "no intersection" if segemnt lies outside the plane
+            if(dist > 0.0f) return 0;
+        }
+        else
+        {
+            f32 t = dist / denom;
+            if(denom < 0.0f)
+            {
+                // when entering halfspace, update tfirst if t is larger
+                if(t > tFirst) tFirst = t;
+            }
+            else
+            {
+                // when exiting halfspace, update tLast if t is smaller
+                if(t < tLast) tLast = t;
+            }
+
+            if(tFirst > tLast) return 0;
+        }
+    }
+    *tOut = tFirst;
+    return 1;
+}
+
+Entity *MousePicking3D(View *view)
+{
+    // get the mouse relative to the view but from the bottom up
+    i32 mouseRelX = MouseRelX(view) + view->w * 0.5f;
+    i32 mouseRelY = view->h - (MouseRelY(view) + view->h * 0.5f);
+
+    Ray ray = GetMouseRay(view, mouseRelX, mouseRelY); 
+
+    // loop over every polygon in the list and save the hitPoint with
+    // the smallest t value
+    f32 tMin = FLT_MAX;
+    Entity *hitEntity = nullptr;
+
+    Entity *entity = gEntityList;
+    while(entity)
+    {
+        BrushPlane *brushPlane = &entity->brushPlane;
+        f32 t = -1.0f;
+        if(RayHitBrushPlane(ray, brushPlane, &t))
+        {
+            if(t < tMin)
+            {
+                tMin = t;
+                hitEntity = entity;
+            }
+        }
+        entity = entity->next;
+    }
+
+    return hitEntity;
+}
+
+bool MouseInControlPoint(View *view, Vec2 rect)
+{
+    ViewOrthoState *state = &view->orthoState;
+    f32 mouseRelX = MouseRelX(view);
+    f32 mouseRelY = MouseRelY(view);
+    f32 mouseScrX, mouseScrY;
+    ScreenToWorld(mouseRelX, mouseRelY, mouseScrX, mouseScrY, state->offsetX, state->offsetY, state->zoom); 
+
+    f32 w = 4*(1.0f/state->zoom);
+
+    if(mouseScrX >= rect.x - w &&
+       mouseScrX <= rect.x + w &&
+       mouseScrY >= rect.y - w &&
+       mouseScrY <= rect.y + w)
+    {
+        return true;
+    }
+    return false;
+}

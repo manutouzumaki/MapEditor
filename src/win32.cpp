@@ -255,7 +255,7 @@ static void InitD3D11(HWND window)
     device->CreateRasterizerState(&wireFrameRasterizerDesc, &wireFrameRasterizer);
 
     // Create Sampler State
-    D3D11_SAMPLER_DESC colorMapDesc;
+    D3D11_SAMPLER_DESC colorMapDesc = {};
     // D3D11_TEXTURE_ADDRESS_CLAMP; D3D11_TEXTURE_ADDRESS_WRAP;
     colorMapDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP; 
     colorMapDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP; 

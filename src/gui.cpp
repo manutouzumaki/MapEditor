@@ -18,8 +18,6 @@ void InitImGui(HWND window)
 
 void RenderImGui()
 {
-    static bool show_demo_window = false;
-    ImVec4 clear_color = ImVec4(116.0f/255.0f, 116.0f/255.0f, 245.0f/255.0f, 1.00f);
     ImGuiIO& io = ImGui::GetIO(); (void)io;
 
     // Start the Dear ImGui frame
@@ -35,9 +33,9 @@ void RenderImGui()
     ImGui::Text("%.1f FPS", io.Framerate);
 
     ImGui::Text("Editor mode:");               
-    ImGui::RadioButton("Select Poly", &(i32)gCurrentEditorMode, EDITOR_MODE_SELECT_POLY);
-    ImGui::RadioButton("Add Poly", &(i32)gCurrentEditorMode, EDITOR_MODE_ADD_POLY);
-    ImGui::RadioButton("Modify Poly", &(i32)gCurrentEditorMode, EDITOR_MODE_MODIFY_POLY);
+    ImGui::RadioButton("Select Entity", &(i32)gCurrentEditorMode, EDITOR_MODE_SELECT_POLY);
+    ImGui::RadioButton("Add Entity", &(i32)gCurrentEditorMode, EDITOR_MODE_ADD_POLY);
+    ImGui::RadioButton("Modify Entity", &(i32)gCurrentEditorMode, EDITOR_MODE_MODIFY_POLY);
     ImGui::RadioButton("Move 3D Camera", &(i32)gCurrentEditorMode, EDITOR_MODE_MOVE_3D_CAMERA);
     ImGui::RadioButton("Set Texture", &(i32)gCurrentEditorMode, EDITOR_MODE_SET_TEXTURE);
     ImGui::RadioButton("Clipping", &(i32)gCurrentEditorMode, EDITOR_MODE_CLIPPING);
@@ -67,18 +65,8 @@ void RenderImGui()
         }
         ImGui::PopID();
     }
-    
-
-
-    //ImGui::Checkbox("Demo Window", &show_demo_window);
 
     ImGui::End();
-
-    if (show_demo_window)
-        ImGui::ShowDemoWindow(&show_demo_window);
-
-
-
     ImGui::Render();
 }
 
@@ -89,8 +77,6 @@ void PresentImGui()
 
 void ShutDownImGui()
 {
-
-    // Cleanup
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();

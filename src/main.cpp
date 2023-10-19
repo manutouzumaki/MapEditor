@@ -85,6 +85,8 @@ static u32 gCurrentTexture;
 #include "viewManager.cpp"
 #include "gui.cpp"
 
+#include "exporter.cpp"
+
 void ProcessWindowResize(ViewManager *vm, CBuffer *cbuffer, f32 &clientWidth, Rect &clientRect, Rect &uiRect)
 {
     if(gResizeWidth != 0 && gResizeHeight != 0)

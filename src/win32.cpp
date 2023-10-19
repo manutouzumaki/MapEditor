@@ -434,6 +434,33 @@ static File ReadFile(char *filepath)
     return result;
 }
 
+static bool WriteBinaryFile(const char* FilePath, void* Memory, size_t MemorySize)
+{
+    bool Result = false;
+    HANDLE FileHandle = CreateFileA(FilePath,
+                                    GENERIC_WRITE, 0,
+                                    0, CREATE_ALWAYS, 0, 0);
+    if(FileHandle != INVALID_HANDLE_VALUE)
+    {
+        DWORD BytesWritten;
+        if(WriteFile(FileHandle, Memory, MemorySize, &BytesWritten, 0))
+        {
+            // NOTE: File Read Successfully.
+            Result = (BytesWritten == MemorySize);
+        }
+        else
+        {
+            printf("Error Written the FILE: %s", FilePath);
+        }
+        CloseHandle(FileHandle);
+    }
+    else
+    {
+        printf("Error Opening FILE: %s", FilePath);
+    }
+    return(Result);
+}
+
 static Shader LoadShader(char *vertpath, char *fragpath)
 {
     Shader shader = {};

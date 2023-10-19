@@ -66,6 +66,15 @@ void RenderImGui()
         ImGui::PopID();
     }
 
+    if(ImGui::Button("Save File"))
+    {
+        CreateBinaryFile_HMAP(); 
+    }
+    if(ImGui::Button("Load File"))
+    {
+        LoadBinaryFile_HMAP("../maps/test.map");
+    }
+
     ImGui::End();
     ImGui::Render();
 }

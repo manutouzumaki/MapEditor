@@ -143,35 +143,6 @@ struct Poly2D
     u32 color;
 };
 
-/*
-struct Poly3D
-{
-    Vertex vertices[256];
-    i32 verticesCount;
-};
-
-struct PolyPlane
-{
-    Plane plane;
-    TextureAxisNormal axisNormal;
-    u32 texture;
-};
-
-struct BrushPlane
-{
-    PolyPlane *planes;
-};
-
-struct BrushVertex
-{
-    Poly3D *polygons;
-};
-
-struct Brush2D
-{
-    Poly2D *polygons;
-};
-*/
 enum PointToPlane
 {
     POINT_IN_FRONT_OF_PLANE,

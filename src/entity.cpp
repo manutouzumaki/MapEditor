@@ -39,6 +39,25 @@ Entity *EntityCreate(Vec2 start, Vec2 end, ViewId viewId)
     return entity;
 }
 
+Entity *EntityCreateFromBrushPlane(BrushPlane *brushPlane)
+{
+    Entity *entity = (Entity *)malloc(sizeof(Entity));
+    memset(entity, 0, sizeof(Entity)); 
+
+    entity->brushPlane = *brushPlane;
+    entity->brushVert = BrushVertexCreate(&entity->brushPlane);
+    
+    // TODO: temporal hack FIX this
+    entity->brushes2D[VIEW_SIDE]  = Brush2DCreate({}, {});
+    entity->brushes2D[VIEW_FRONT] = Brush2DCreate({}, {});
+    entity->brushes2D[VIEW_TOP]   = Brush2DCreate({}, {});
+    Brush2DUpdate(&entity->brushes2D[VIEW_TOP],   &entity->brushVert, &entity->brushPlane, {0, 1, 0});
+    Brush2DUpdate(&entity->brushes2D[VIEW_FRONT], &entity->brushVert, &entity->brushPlane, {0, 0, 1});
+    Brush2DUpdate(&entity->brushes2D[VIEW_SIDE],  &entity->brushVert, &entity->brushPlane, {1, 0, 0});
+
+    return entity;
+}
+
 void EntityUpdate(Entity *entity, ViewId viewId,
                   Vec2 oBotL, Vec2 oBotR, Vec2 oTopL, Vec2 oTopR,
                   Vec2 botL,  Vec2 botR,  Vec2 topL,  Vec2 topR)
@@ -83,6 +102,23 @@ Entity *EntityAdd(Entity *front, Vec2 start, Vec2 end, ViewId viewId)
     else
     {
         Entity *newEntity = EntityCreate(start, end, viewId);
+        newEntity->prev = nullptr;
+        newEntity->next = nullptr;
+        return newEntity;
+    }
+}
+
+Entity *EntityAdd(Entity *front, Entity *newEntity)
+{
+    if(front != nullptr)
+    {
+        newEntity->prev = nullptr;
+        newEntity->next = front;
+        front->prev = newEntity;
+        return newEntity;
+    }
+    else
+    {
         newEntity->prev = nullptr;
         newEntity->next = nullptr;
         return newEntity;

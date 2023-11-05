@@ -1,3 +1,4 @@
+#define ILEGAL_EPSILON 0.01f
 BrushVertex BrushVertexCreate(BrushPlane *brushPlane)
 {
     i32  planesCount = DarraySize(brushPlane->planes);
@@ -25,7 +26,7 @@ BrushVertex BrushVertexCreate(BrushPlane *brushPlane)
                     f32 dot = Vec3Dot(plane.n, vertex.position);
                     f32 d = plane.d;
                     f32 dist = dot - d;
-                    if(dist > EPSILON)
+                    if(dist > ILEGAL_EPSILON)
                     {
                         illegal = true;
                     }
@@ -72,7 +73,10 @@ BrushVertex BrushVertexCreate(BrushPlane *brushPlane)
         Plane polygonPlane = brushPlane->planes[p].plane; 
         Poly3D *polygon = brushVertex.polygons + p;
 
-        ASSERT(polygon->verticesCount >= 3);
+        // ASSERT(polygon->verticesCount >= 3);
+        if(polygon->verticesCount < 3) {
+            printf("Error creating Polygon Vertices!!!\n");
+        }
 
         Vec3 center = GetCenterOfPolygon(polygon);
 

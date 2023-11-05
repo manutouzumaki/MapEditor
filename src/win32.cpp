@@ -805,7 +805,7 @@ void LoadTextureToTextureArray(TextureArray *array, char * filepath)
     stbi_set_flip_vertically_on_load(false);
     // fisrt load the new texture to be added to the atlas
     i32 width, height, nrComponents;
-    u8 *pixels = stbi_load(filepath, &width, &height, &nrComponents, 0);
+    u8 *pixels = stbi_load(filepath, &width, &height, &nrComponents, 4);
 
     if(pixels == 0)
     {

@@ -1,3 +1,11 @@
+static Plane GetPlaneFromThreePoints(Vec3 a, Vec3 b, Vec3 c)
+{
+    Plane p;
+    p.n = Vec3Normalized(Vec3Cross(b - a, c - a));
+    p.d = Vec3Dot(p.n, a);
+    return p;
+}
+
 static bool GetIntersection(Vec3 n1, Vec3 n2, Vec3 n3, f32 d1, f32 d2, f32 d3, Vertex *vertex)
 {
     Vec3 u = Vec3Cross(n2, n3);
@@ -18,14 +26,6 @@ static Vec3 GetCenterOfPolygon(Poly3D *polygon)
     }
     center = center / polygon->verticesCount;
     return center;
-}
-
-static Plane GetPlaneFromThreePoints(Vec3 a, Vec3 b, Vec3 c)
-{
-    Plane p;
-    p.n = Vec3Normalized(Vec3Cross(b - a, c - a));
-    p.d = Vec3Dot(p.n, a);
-    return p;
 }
 
 static void RemoveVertexAtIndex(Poly3D *poly, i32 index)
@@ -381,7 +381,8 @@ static bool RayHitBrushPlane(Ray ray, BrushPlane *brushPlane, f32 *tOut)
     {
         Plane p = brushPlane->planes[i].plane;
         f32 denom = Vec3Dot(p.n, d);
-        f32 dist = (p.d / g3DScale) - Vec3Dot(p.n, a);
+        //f32 dist = (p.d / g3DScale) - Vec3Dot(p.n, a);
+        f32 dist = Vec3Dot(p.n, a) - (p.d / g3DScale);
         // test if segment runs parallel to tha plane
         if(denom == 0.0f)
         {
@@ -390,7 +391,7 @@ static bool RayHitBrushPlane(Ray ray, BrushPlane *brushPlane, f32 *tOut)
         }
         else
         {
-            f32 t = dist / denom;
+            f32 t = -(dist / denom);
             if(denom < 0.0f)
             {
                 // when entering halfspace, update tfirst if t is larger

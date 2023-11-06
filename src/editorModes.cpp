@@ -166,7 +166,7 @@ void EditorModeClipping(View *view)
 
     ViewOrthoState *state = &view->orthoState;
 
-    ASSERT(gSelectedEntity != nullptr);
+    if(gSelectedEntity == nullptr) return;
 
     Brush2D *brush = &gSelectedEntity->brushes2D[view->id];
 
@@ -273,8 +273,11 @@ void EditorModeClipping(View *view)
     if(MouseJustDown(MOUSE_BUTTON_RIGHT) && state->planeCreated == true)
     {
         // a function that return the correct plane depending on the view you use to
-        // create the clipping plane
+        // create the clipping plane 
         Plane clipPlane = state->createViewClipPlane(state->startP, state->endP);
+
+        if(!PlaneHitBrush(&gSelectedEntity->brushVert, clipPlane)) return;
+        
         EntityClip(gSelectedEntity, view->id, clipPlane);
         state->planeCreated = false;
         gDirtyFlag = true;

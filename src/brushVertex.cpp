@@ -225,3 +225,23 @@ void BrushVertexDestroy(BrushVertex *brushVertex)
 {
     if(brushVertex->polygons) DarrayDestroy(brushVertex->polygons);
 }
+
+
+bool PlaneHitBrush(BrushVertex *brushVertex, Plane plane)
+{
+    i32 straddling = 0;
+    for(i32 i = 0; i < DarraySize(brushVertex->polygons); ++i)
+    {
+        Poly3D *poly = &brushVertex->polygons[i];
+
+        switch(ClassifyPolygonToPlane(poly, plane))
+        {
+            case POLYGON_STRADDLING_PLANE:
+            {
+                straddling++;
+            } break;
+        }
+    }
+
+    return  (straddling > 0);
+}

@@ -31,6 +31,9 @@ void RenderImGui()
     ImGui::SetWindowPos(ImVec2(0, 0));
     
     ImGui::Text("%.1f FPS", io.Framerate);
+    ImGui::Text("%lfgb / %lfgb",
+                (f64)gDynamicVertexBuffer.used / (f64)GIGABYTES(1),
+                (f64)gDynamicVertexBuffer.size / (f64)GIGABYTES(1));
 
     ImGui::Text("Editor mode:");               
     ImGui::RadioButton("Select Entity", &(i32)gCurrentEditorMode, EDITOR_MODE_SELECT_POLY);

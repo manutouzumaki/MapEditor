@@ -154,7 +154,8 @@ int main()
 
     // Load Vertex Buffer
     gVertexBuffer = LoadVertexBuffer(gQuad, ARRAY_LENGTH(gQuad), layout);
-    gDynamicVertexBuffer = LoadDynamicVertexBuffer(2*13770*sizeof(Vertex), layout); // TODO: set the size better
+    //gDynamicVertexBuffer = LoadDynamicVertexBuffer(2*13770*sizeof(Vertex), layout); // TODO: set the size better
+    gDynamicVertexBuffer = LoadDynamicVertexBuffer(GIGABYTES(1), layout); // TODO: set the size better
 
     // Load FrameBuffer
     f32 clientWidth = (WINDOW_WIDTH - gFixWidth);

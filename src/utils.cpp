@@ -287,6 +287,8 @@ bool PointHitPoly2D(Poly2D *poly, f32 x, f32 y, f32 zoom)
         Vec2 b = poly->vertices[(i + 1) % DarraySize(poly->vertices)];
         Vec2 ab = b - a;
 
+        if(Vec2LenSq(ab) <= VEC_EPSILON) continue;
+
         // create the rect orthonormal basis
         Vec2 o = a + ab * 0.5f;
         Vec2 r = Vec2Normalized(ab);

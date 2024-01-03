@@ -88,7 +88,7 @@ void RenderImGui()
     if(ImGui::Button("Load Texture"))
     {
         if(strcmp(texturePath, "") != 0) {
-            LoadTextureToTextureArray(&gTextureArray, texturePath);
+            gShowErrorWindow = !LoadTextureToTextureArray(&gTextureArray, texturePath);
         }
     }
     if(ImGui::Button("Show Textures"))

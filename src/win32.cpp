@@ -802,7 +802,7 @@ void UnloadTextureArrayGpuData(TextureArray *array)
     if(array->srv) array->srv->Release(); array->srv = 0;
 }
 
-void LoadTextureToTextureArray(TextureArray *array, char * filepath)
+bool LoadTextureToTextureArray(TextureArray *array, char * filepath)
 {
 
     // Create the CPU stuff
@@ -814,7 +814,8 @@ void LoadTextureToTextureArray(TextureArray *array, char * filepath)
     if(pixels == 0)
     {
         printf("Error loading texture: %s\n", filepath);
-        ASSERT(!"INVALID_CODE_PATH");
+        //ASSERT(!"INVALID_CODE_PATH");
+        return false;
     }
 
     Texture texture = {};
@@ -841,7 +842,8 @@ void LoadTextureToTextureArray(TextureArray *array, char * filepath)
     if(FAILED(device->CreateTexture2D(&texDesc, 0, &guiTexture)))
     {
         printf("Error creating Textures for GUI\n");
-        ASSERT(!"INVALID_CODE_PATH");
+        //ASSERT(!"INVALID_CODE_PATH");
+        return false;
     }
     D3D11_SUBRESOURCE_DATA data = {};
     data.pSysMem = pixels;
@@ -859,7 +861,8 @@ void LoadTextureToTextureArray(TextureArray *array, char * filepath)
     if (FAILED(device->CreateShaderResourceView(guiTexture, &srvDesc, &guiSrv)))
     {
         printf("Error creating Srv for GUI\n");
-        ASSERT(!"INVALID_CODE_PATH");
+        //ASSERT(!"INVALID_CODE_PATH");
+        return false;
     }
     DarrayPush(array->guiSrv, guiSrv, ID3D11ShaderResourceView *);
 
@@ -869,6 +872,8 @@ void LoadTextureToTextureArray(TextureArray *array, char * filepath)
 
     UnloadTextureArrayGpuData(array);
     LoadTextureArrayGpuData(array);
+
+    return false;
 
 }
 

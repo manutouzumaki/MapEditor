@@ -62,16 +62,25 @@ i32 MouseLastY()
 
 i32 MouseWheelDelta()
 {
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    if(io.WantCaptureMouse) return false;
+
     return gInput.wheelDelta;
 }
 
 bool MouseIsDown(i32 mouseButton)
 {
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    if(io.WantCaptureMouse) return false;
+
     return gInput.buttons[mouseButton].down;
 }
 
 bool MouseJustDown(i32 mouseButton)
 {
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    if(io.WantCaptureMouse) return false;
+
     if(gInput.buttons[mouseButton].down != gInput.buttons[mouseButton].wasDown)
     {
         if(gInput.buttons[mouseButton].down)
@@ -85,6 +94,9 @@ bool MouseJustDown(i32 mouseButton)
 
 bool MouseJustUp(i32 mouseButton)
 {
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    if(io.WantCaptureMouse) return false;
+
     if(gInput.buttons[mouseButton].down != gInput.buttons[mouseButton].wasDown)
     {
         if(gInput.buttons[mouseButton].wasDown)
@@ -97,11 +109,17 @@ bool MouseJustUp(i32 mouseButton)
 
 bool KeyIsDown(i32 key)
 {
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    if(io.WantCaptureKeyboard) return false;
+
     return gInput.keys[key].down;
 }
 
 bool KeyJustDown(i32 key)
 {
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    if(io.WantCaptureKeyboard) return false;
+
     if(gInput.keys[key].down != gInput.keys[key].wasDown)
     {
         if(gInput.keys[key].down)
@@ -114,6 +132,9 @@ bool KeyJustDown(i32 key)
 
 bool KeyJustUp(i32 key)
 {
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    if(io.WantCaptureKeyboard) return false;
+
     if(gInput.keys[key].down != gInput.keys[key].wasDown)
     {
         if(gInput.keys[key].wasDown)

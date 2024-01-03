@@ -32,12 +32,12 @@ struct BinaryFile
 
 
 
-void CreateBinaryFile_HMAP()
+bool CreateBinaryFile_HMAP(const char *filepath)
 {
     size_t fileSize = sizeof(HMapHeader);
     
     // find the amount of memory to alloc
-    if(gEntityList == nullptr) return;
+    if(gEntityList == nullptr) return false;
     
     Entity *entity = gEntityList;
     while(entity)
@@ -115,11 +115,10 @@ void CreateBinaryFile_HMAP()
 
     ASSERT(file.used <= file.size);
 
-    // TODO: write file ...
-    WriteBinaryFile("../maps/test2.map", (void *)file.data, file.size);
+    return WriteBinaryFile(filepath, (void *)file.data, file.size);
 }
 
-void LoadBinaryFile_HMAP(char *filepath)
+bool LoadBinaryFile_HMAP(char *filepath)
 {
     if(gEntityList != nullptr)
     {
@@ -133,9 +132,15 @@ void LoadBinaryFile_HMAP(char *filepath)
         gEntityList = nullptr;
         gSelectedEntity = nullptr;
     }
+    bool success = false;
+    File file = ReadFile(filepath, &success);
 
-    File file = ReadFile(filepath);
+    if(success == false) {
+        return false;
+    }
+
     u8 *data = (u8 *)file.data;
+    u8 *eof = data + file.size;
 
     HMapHeader *hMapheader = (HMapHeader *)data;
     u8 *entityChunk = data + hMapheader->entityOffset;
@@ -163,17 +168,16 @@ void LoadBinaryFile_HMAP(char *filepath)
 
     gDirtyFlag = true;
 
-    
-
-    // TODO: for testing we just need the entities ...
-    /*
     u8 *currentTexture = textureChunk;
-    while(currentTexture != '\0')
+    while(currentTexture < eof)
     {
-
+        TextureHeader *textureHeader = (TextureHeader *)currentTexture;
+        currentTexture += sizeof(TextureHeader);
+        LoadTextureToTextureArray(&gTextureArray, currentTexture, textureHeader->textureWidth, textureHeader->textureHeight);
+        currentTexture += sizeof(u32) * textureHeader->textureWidth * textureHeader->textureHeight;
     }
-    */
-
 
     free(file.data); 
+
+    return success;
 }

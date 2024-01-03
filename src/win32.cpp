@@ -302,7 +302,6 @@ static void FlushEvents(HWND window)
     {
         switch(msg.message)
         {
-            // TODO: handle important messages
             case WM_MOUSEMOVE:
             {
                 gInput.x = (i32)GET_X_LPARAM(msg.lParam);
@@ -396,10 +395,12 @@ static void ResizeD3D11()
     deviceContext->RSSetViewports(1, &viewport);
 }
 
-static File ReadFile(char *filepath)
+static File ReadFile(char *filepath, bool *success = nullptr)
 {
     File result;
     memset(&result, 0, sizeof(File));
+
+    if(success != nullptr) *success = true;
 
     HANDLE hFile = CreateFileA(filepath, GENERIC_READ,
             FILE_SHARE_READ, 0, OPEN_EXISTING,
@@ -408,7 +409,8 @@ static File ReadFile(char *filepath)
     if(hFile == INVALID_HANDLE_VALUE)
     {
         printf("Error reading file: %s\n", filepath);
-        ASSERT(!"INVALID_CODE_PATH");
+        // ASSERT(!"INVALID_CODE_PATH");
+        if(success != nullptr) *success = false;
     }
 
     LARGE_INTEGER bytesToRead;
@@ -420,7 +422,8 @@ static File ReadFile(char *filepath)
     if(!ReadFile(hFile, data, bytesToRead.QuadPart, (LPDWORD)&bytesReaded, 0))
     {
         printf("Error reading file: %s\n", filepath);
-        ASSERT(!"INVALID_CODE_PATH");
+        //ASSERT(!"INVALID_CODE_PATH");
+        if(success != nullptr) *success = false;
     }
 
     char *end = ((char *)data) + bytesToRead.QuadPart;
@@ -447,6 +450,7 @@ static bool WriteBinaryFile(const char* FilePath, void* Memory, size_t MemorySiz
         {
             // NOTE: File Read Successfully.
             Result = (BytesWritten == MemorySize);
+            Result = true;
         }
         else
         {
@@ -868,8 +872,64 @@ void LoadTextureToTextureArray(TextureArray *array, char * filepath)
 
 }
 
+void LoadTextureToTextureArray(TextureArray *array, u8 *pixels, i32 width, i32 height)
+{
+    Texture texture = {};
+    texture.w = width;
+    texture.h = height;
+    texture.pixels = (u32 *)malloc(sizeof(u32)*width*height);
+    memcpy(texture.pixels, pixels, sizeof(u32)*width*height);
+    DarrayPush(array->cpuTextureArray, texture, Texture);
+
+
+    D3D11_TEXTURE2D_DESC texDesc;
+    texDesc.Width = width;
+    texDesc.Height = height;
+    texDesc.MipLevels = 0;
+    texDesc.ArraySize = 1;
+    texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.SampleDesc.Quality = 0;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    texDesc.CPUAccessFlags = 0;
+    texDesc.MiscFlags = 0;
+    ID3D11Texture2D *guiTexture = 0;
+    if(FAILED(device->CreateTexture2D(&texDesc, 0, &guiTexture)))
+    {
+        printf("Error creating Textures for GUI\n");
+        ASSERT(!"INVALID_CODE_PATH");
+    }
+    D3D11_SUBRESOURCE_DATA data = {};
+    data.pSysMem = pixels;
+    data.SysMemPitch  = width*sizeof(u32);
+    data.SysMemSlicePitch = 0;
+    deviceContext->UpdateSubresource(guiTexture, 0, 0, data.pSysMem, data.SysMemPitch, 0);
+    DarrayPush(array->guiTextures, guiTexture, ID3D11Texture2D *);
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+    ID3D11ShaderResourceView *guiSrv =  0;
+    if (FAILED(device->CreateShaderResourceView(guiTexture, &srvDesc, &guiSrv)))
+    {
+        printf("Error creating Srv for GUI\n");
+        ASSERT(!"INVALID_CODE_PATH");
+    }
+    DarrayPush(array->guiSrv, guiSrv, ID3D11ShaderResourceView *);
+
+    array->size++;
+
+    UnloadTextureArrayGpuData(array);
+    LoadTextureArrayGpuData(array);
+
+}
+
 void UnloadTextureArray(TextureArray *array)
 {
+    if (DarraySize(array->cpuTextureArray) == 0) return;
     for(i32 i = 0; i < DarraySize(array->cpuTextureArray); ++i)
     {
         free(array->cpuTextureArray[i].pixels);
@@ -880,5 +940,6 @@ void UnloadTextureArray(TextureArray *array)
     DarrayDestroy(array->cpuTextureArray);
     UnloadTextureArrayGpuData(array);
 
+    *array = {};
 
 }

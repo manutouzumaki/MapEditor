@@ -154,7 +154,6 @@ int main()
 
     // Load Vertex Buffer
     gVertexBuffer = LoadVertexBuffer(gQuad, ARRAY_LENGTH(gQuad), layout);
-    //gDynamicVertexBuffer = LoadDynamicVertexBuffer(2*13770*sizeof(Vertex), layout); // TODO: set the size better
     gDynamicVertexBuffer = LoadDynamicVertexBuffer(GIGABYTES(1), layout); // TODO: set the size better
 
     // Load FrameBuffer
@@ -175,27 +174,6 @@ int main()
     cbuffer.proj = Mat4Ortho(0.0f, (f32)WINDOW_WIDTH, 0.0f, (f32)WINDOW_HEIGHT, 0.0f, 100.0f);
     cbuffer.viewDir = {};
     gConstBuffer = LoadConstBuffer((void *)&cbuffer, sizeof(CBuffer), 0);
-
-#if 0
-    LoadTextureToTextureArray(&gTextureArray, "../assets/wood.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/white.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/brick.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/grass.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/cool.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/noTexture.png");
-#endif
-    LoadTextureToTextureArray(&gTextureArray, "../assets/wood.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/lava.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/water.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/brick1.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/brick2.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/brick3.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/brick4.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/crate.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/grass1.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/grass2.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/grass3.png");
-    LoadTextureToTextureArray(&gTextureArray, "../assets/grass4.png");
 
     ShowWindow(window, SW_MAXIMIZE);
 
